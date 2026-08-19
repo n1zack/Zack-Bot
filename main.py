@@ -1,3 +1,13 @@
+import asyncio
+import sys
+
+# إنشاء حلقة أحداث مسبقة وإجبار بايثون عليها لتتوافق مع Pyrogram تماماً
+try:
+    loop = asyncio.get_event_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
 import threading
 import logging
 from pyrogram import Client
@@ -28,15 +38,14 @@ async def handle(request):
 web_app.add_routes([web.get('/', handle)])
 
 def run_web_server():
-    # تشغيل سيرفر الويب على المنفذ 10000 بشكل منفصل
     web.run_app(web_app, host='0.0.0.0', port=10000, print=None)
 
 if __name__ == "__main__":
-    # تشغيل سيرفر الويب في خلفية منفصلة (Thread)
+    # تشغيل سيرفر الويب في خلفية منفصلة
     server_thread = threading.Thread(target=run_web_server, daemon=True)
     server_thread.start()
     logging.info("Web server started in background.")
 
-    # تشغيل بوت تيليجرام بشكل أساسي
+    # تشغيل بوت تيليجرام
     logging.info("Starting Telegram Bot...")
     app.run()

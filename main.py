@@ -37,16 +37,16 @@ async def start_web_server():
 
 client = TelegramClient('zack_bot', API_ID, API_HASH)
 
-# --- معالجة الملفات المرسلة (ZIP / Session / Txt) ---
+# --- معالجة الملفات المرسلة (ZIP / Session / Txt) بالعدد الصحيح ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     if not event.file:
         return
         
     path = await event.download_media()
-    await event.respond("📂 جاري معالجة الملف واستخراج الحسابات الخاصة بك...")
+    await event.respond("📂 جاري فحص الملف ومعالجة الجلسات الخاصة بك...")
     
-    count = 0
+    sessions_found = 0
     if path.endswith('.zip'):
         extract_dir = f"sessions_{event.sender_id}"
         os.makedirs(extract_dir, exist_ok=True)
@@ -55,12 +55,16 @@ async def handle_session_file(event):
             zip_ref.extractall(extract_dir)
             for root, dirs, files in os.walk(extract_dir):
                 for file in files:
-                    if file.endswith('.session') or file.endswith('.txt'):
-                        count += 1
+                    if file.endswith('.session'):
+                        sessions_found += 1
                         
-        await event.respond(f"✅ تم بنجاح استخراج وإضافة {count} جلسة خاصة بك وحدك 🔒!")
+        if sessions_found > 0:
+            await event.respond(f"✅ تم بنجاح استخراج وإضافة {sessions_found} جلسة خاصة بك وحدك 🔒!")
+        else:
+            await event.respond("⚠️ لم يتم العثور على ملفات `.session` صالحة داخل الملف المضغوط.")
     
-    elif path.endswith('.session') or path.endswith('.txt'):
+    elif path.endswith('.session'):
+        sessions_found = 1
         await event.respond("✅ تم حفظ الملف وجلسة الحساب بنجاح في قائمتك الخاصة!")
     
     else:
@@ -69,7 +73,7 @@ async def handle_session_file(event):
     if os.path.exists(path):
         os.remove(path)
 
-# --- أمر /start الرئيسي (تم إصلاح تمرير الأزرار هنا) ---
+# --- أمر /start الرئيسي ---
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
     user_id = event.sender_id
@@ -79,10 +83,9 @@ async def start(event):
         f"معرفك (ID): `{user_id}`\n\n"
         "اختر العملية المطلوبة لإدارة الحسابات والجلسات والأرقام:"
     )
-    # استخدام اللوحة الشفافة الصحيحة مباشرة بدون أخطاء تداخل القوائم
     await event.respond(welcome_text, buttons=get_main_keyboard())
 
-# --- معالج الأزرار الشفافة (Callbacks) ---
+# --- معالج الأزرار الشفافة الكامل لكافة الأقسام ---
 @client.on(events.CallbackQuery)
 async def callback_handler(event):
     data = event.data.decode('utf-8')
@@ -248,9 +251,8 @@ async def handle_user_messages(event):
 async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
-    logging.info("Zack-Bot started successfully.")
+    logging.info("Zack-Bot started successfully with full features.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

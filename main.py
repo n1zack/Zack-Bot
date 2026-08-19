@@ -4,6 +4,7 @@ import zipfile
 import asyncio
 import datetime
 import sqlite3
+import aiohttp
 from aiohttp import web
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession
@@ -49,6 +50,23 @@ async def start_web_server():
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
     logger.info(f"Web server started on port {port}.")
+
+# دالة إرسال Ping تلقائي للبوت كل 5 دقائق لمنع الخمول على Render
+async def keep_alive():
+    await asyncio.sleep(15)
+    # استبدل الرابط أدناه برابط موقعك الفعلي على Render
+    RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://your-app-name.onrender.com")
+    
+    while True:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(RENDER_URL) as response:
+                    logger.info(f"Keep-Alive ping sent to {RENDER_URL}, status: {response.status}")
+        except Exception as e:
+            logger.error(f"Keep-Alive ping failed: {e}")
+        
+        # الانتظار لمدة 5 دقائق (300 ثانية)
+        await asyncio.sleep(300)
 
 # تهيئة عميل التيليجرام الأساسي للبوت
 client = TelegramClient('zack_bot_main', API_ID, API_HASH)
@@ -290,7 +308,6 @@ async def handle_user_messages(event):
                 expiry = add_subscriber(target_user_id, days)
                 await event.respond(f"✅ تم تفعيل الاشتراك للمستخدم `{target_user_id}` لمدة `{days}` أيام حتى `{expiry}`.")
                 
-                # إرسال إشعار للمستخدم بتفعيل اشتراكه
                 try:
                     await client.send_message(
                         target_user_id, 
@@ -428,9 +445,13 @@ async def handle_user_messages(event):
 
 async def main():
     await start_web_server()
+    # تشغيل مهمة البقاء نشطاً في الخلفية لمنع الخمول
+    asyncio.create_task(keep_alive())
+    
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with full database & messaging features.")
+    logger.info("Zack-Bot started successfully with Keep-Alive task & full database.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
     asyncio.run(main())
+ 

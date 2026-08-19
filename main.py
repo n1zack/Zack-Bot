@@ -1,15 +1,5 @@
-import asyncio
-import sys
-
-# ضمان توافق حلقة الأحداث مع بايثون الحديثة
-try:
-    loop = asyncio.get_event_loop()
-except RuntimeError:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
 import os
-import threading
+import asyncio
 import logging
 from aiohttp import web
 from pyrogram import Client
@@ -20,31 +10,39 @@ from database import init_db
 logging.basicConfig(level=logging.INFO)
 init_db()
 
-# إعداد سيرفر الويب لـ Render
+# إعداد البوت
+app = Client(
+    "SuperAdminBot",
+    api_id=config.API_ID,
+    api_hash=config.API_HASH,
+    bot_token=config.BOT_TOKEN
+)
+
+# سيرفر الويب المطلوب من Render
 async def handle(request):
-    return web.Response(text="Bot is running and active!")
+    return web.Response(text="Zack-Bot is running successfully!")
 
-app_web = web.Application()
-app_web.add_routes([web.get('/', handle)])
+web_app = web.Application()
+web_app.add_routes([web.get('/', handle)])
 
-def run_web_server():
+async def main():
+    # بدء تشغيل البوت بشكل غير متزامن
+    await app.start()
+    logging.info("Telegram Bot started successfully.")
+    
+    # إعداد وبدء سيرفر الويب على المنفذ المطلوب من Render
     port = int(os.environ.get("PORT", 10000))
-    web.run_app(app_web, host='0.0.0.0', port=port, print=None)
+    runner = web.AppRunner(web_app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logging.info(f"Web server started on port {port}.")
 
 if __name__ == "__main__":
-    # 1. تشغيل سيرفر الويب في الخلفية ليبقى المنفذ مفتوحاً دائماً أمام Render
-    server_thread = threading.Thread(target=run_web_server, daemon=True)
-    server_thread.start()
-    logging.info("Web server started successfully in background.")
-
-    # 2. تشغيل عميل بوت تيليجرام ليعمل بشكل أساسي ومستمر
-    logging.info("Starting Telegram Bot...")
-    app = Client(
-        "SuperAdminBot",
-        api_id=config.API_ID,
-        api_hash=config.API_HASH,
-        bot_token=config.BOT_TOKEN
-    )
-    
-    # تشغيل البوت
-    app.run()
+    # تشغيل حلقة الأحداث الأساسية
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(main())
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass

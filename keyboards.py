@@ -3,8 +3,8 @@ from telethon import Button
 def get_main_keyboard(is_admin=False):
     keyboard = [
         [Button.inline("📱 أرقامي", "my_numbers"), Button.inline("➕ إضافة رقم", "add_number"), Button.inline("➖ حذف رقم", "delete_number")],
-        [Button.inline("📥 تسجيل دخول (جلسات متعددة)", "session_login")],
-        [Button.inline("🤖 تشغيل بوت (إحالة / Mini App)", "ref_bot")],
+        [Button.inline("📥 تسجيل دخول (جلسات متعددة)", "session_login"), Button.inline("📤 تصدير الجلسات (ZIP)", "export_sessions")],
+        [Button.inline("🤖 تشغيل بوت (إحالة / Mini App)", "ref_bot"), Button.inline("❤️ تفاعل رياكشن", "send_reaction")],
         [Button.inline("📢 انضمام لقناة/مجموعة", "join_chat"), Button.inline("🚪 مغادرة قناة/مجموعة", "leave_chat")],
         [Button.inline("📁 انضمام لمجلد", "join_folder")]
     ]

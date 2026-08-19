@@ -1,3 +1,13 @@
+import asyncio
+import sys
+
+# حل مشكلة حلقة الأحداث في بايثون الحديثة لـ Pyrogram
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
 import logging
 from pyrogram import Client
 from aiohttp import web
@@ -17,7 +27,6 @@ app = Client(
     bot_token=config.BOT_TOKEN
 )
 
-# سيرفر ويب مصغر لإرضاء متطلبات Render للـ Web Service
 async def handle(request):
     return web.Response(text="Bot is running!")
 
@@ -30,11 +39,8 @@ async def start_web():
     await site.start()
 
 if __name__ == "__main__":
-    import asyncio
-    # تشغيل سيرفر الويب أولاً بشكل غير متزامن، ثم تشغيل البوت بالطريقة المباشرة
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_web())
     
-    # تشغيل بوت تيليجرام
     logging.info("Starting Telegram Bot...")
     app.run()

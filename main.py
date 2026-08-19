@@ -54,7 +54,26 @@ async def callback_handler(event):
             "⚙️ **لوحة التحكم والإدارة:**\nاختر القسم المطلوب:",
             buttons=get_admin_panel_keyboard()
         )
+        # أضف هذا الجزء داخل callback_handler بعد التحقق من البيانات
+    
+    if data == "my_numbers":
+        # هنا يجب أن يتصل البوت بقاعدة البيانات لجلب أرقام المستخدم الحالي فقط
+        # كمثال: numbers = db.get_user_numbers(user_id)
+        await event.edit("📱 **أرقامك المسجلة:**\n\n- لا توجد أرقام حالياً.\n\nاستخدم زر 'إضافة رقم' للبدء.", buttons=get_back_keyboard())
+
+    elif data == "add_number":
+        await event.edit("➕ **أرسل الرقم الآن بالصيغة الدولية:**\nمثال: +96170123456", buttons=get_back_keyboard())
+        # هنا تحتاج لحدث (Event) ينتظر رسالة المستخدم التالية (client.wait_for_event)
+
+    elif data == "session_login":
+        await event.edit("📂 **أرسل ملف الجلسة (zip, txt, session):**\nسأقوم بمعالجته فور إرساله.", buttons=get_back_keyboard())
+
+    elif data == "ref_link":
+        await event.edit("🔗 **أرسل رابط الإحالة أو الـ Mini App:**\nسأقوم بتنفيذ الدخول عبر هذا الرابط.", buttons=get_back_keyboard())
         
+    elif data == "send_reaction":
+        await event.edit("❤️ **أرسل رابط المنشور والرياكشن:**\nمثال: https://t.me/channel/123 👍", buttons=get_back_keyboard())
+
     elif data == "stats":
         await event.answer("جلب الإحصائيات...", alert=False)
         # هنا يتم جلب إحصائيات المستخدم الخاص به فقط

@@ -2,6 +2,7 @@ import os
 import logging
 from aiohttp import web
 from telethon import TelegramClient, events
+from telethon.tl.types import ReplyKeyboardRemove
 from database import init_db
 from keyboards import get_main_keyboard, get_back_keyboard
 
@@ -30,14 +31,18 @@ async def start_web_server():
 
 client = TelegramClient('zack_bot', API_ID, API_HASH)
 
-# أمر /start الرئيسي
+# أمر /start الرئيسي (مع إزالة أي أزرار رد ثابتة قديمة)
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
     welcome_text = (
         "👑 **مرحباً بك يا زاك في لوحة تحكم Super Admin**\n\n"
         "إليك لوحة التحكم الشاملة لإدارة الحسابات والجلسات والأزرار:"
     )
-    await event.respond(welcome_text, buttons=get_main_keyboard())
+    # نرسل الأزرار الشفافة وفوقها أمر حذف الأزرار الثابتة القديمة
+    await event.respond(
+        welcome_text, 
+        buttons=[get_main_keyboard(), ReplyKeyboardRemove()]
+    )
 
 # التفاعل مع ضغطات الأزرار
 @client.on(events.CallbackQuery)
@@ -129,10 +134,9 @@ async def callback_handler(event):
 async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
-    logging.info("Telegram Bot started successfully with all features.")
+    logging.info("Telegram Bot started successfully with clean layout.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
- 

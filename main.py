@@ -1,7 +1,7 @@
 import os
 import logging
 from aiohttp import web
-from telethon import TelegramClient
+from telethon import TelegramClient, events
 from database import init_db
 
 logging.basicConfig(level=logging.INFO)
@@ -27,14 +27,14 @@ async def start_web_server():
     await site.start()
     logging.info(f"Web server started on port {port}.")
 
-# إعداد البوت باستخدام Telethon (متوافق 100% مع أحدث إصدارات بايثون)
+# إعداد البوت باستخدام Telethon
 client = TelegramClient('zack_bot', API_ID, API_HASH)
 
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
     await event.respond('أهلاً بك يا زاك! البوت يعمل بكامل طاقته.')
 
-async main():
+async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
     logging.info("Telegram Bot started successfully.")
@@ -43,3 +43,4 @@ async main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+ 

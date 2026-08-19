@@ -1,3 +1,2 @@
-tgcrypto
 aiohttp
 telethon

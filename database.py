@@ -71,11 +71,7 @@ def is_subscribed(user_id):
     row = cursor.fetchone()
     conn.close()
     if row:
-        expiry = datetime.strptime(row[0], '%Y-%m-%d') if 'strptime' in globals() or __import__('datetime'):
-            # استخدام مكتبة datetime بشكل صحيح
-            pass
-        import datetime as dt
-        expiry_date = dt.datetime.strptime(row[0], '%Y-%m-%d')
-        if expiry_date > dt.datetime.now():
+        expiry_date = datetime.datetime.strptime(row[0], '%Y-%m-%d')
+        if expiry_date > datetime.datetime.now():
             return True
     return False

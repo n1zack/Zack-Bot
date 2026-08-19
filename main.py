@@ -3,7 +3,7 @@ import logging
 import zipfile
 import asyncio
 from aiohttp import web
-from telethon import TelegramClient, events, Button
+from telethon import TelegramClient, events
 from telethon.errors import SessionPasswordNeededError
 from database import init_db, add_user_number, get_user_numbers
 from keyboards import get_main_keyboard, get_admin_panel_keyboard, get_back_keyboard
@@ -69,7 +69,7 @@ async def handle_session_file(event):
     if os.path.exists(path):
         os.remove(path)
 
-# --- أمر /start الرئيسي (مع إزالة الأزرار الثابتة بالطريقة الصحيحة) ---
+# --- أمر /start الرئيسي (تم إصلاح تمرير الأزرار هنا) ---
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
     user_id = event.sender_id
@@ -79,8 +79,8 @@ async def start(event):
         f"معرفك (ID): `{user_id}`\n\n"
         "اختر العملية المطلوبة لإدارة الحسابات والجلسات والأرقام:"
     )
-    # إزالة الأزرار الثابتة باستخدام Button.clear() مع لوحة الأزرار الشفافة
-    await event.respond(welcome_text, buttons=[Button.clear(), get_main_keyboard()])
+    # استخدام اللوحة الشفافة الصحيحة مباشرة بدون أخطاء تداخل القوائم
+    await event.respond(welcome_text, buttons=get_main_keyboard())
 
 # --- معالج الأزرار الشفافة (Callbacks) ---
 @client.on(events.CallbackQuery)
@@ -253,3 +253,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+ 

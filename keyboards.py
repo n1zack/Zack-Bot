@@ -1,32 +1,19 @@
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from telethon import Button
 
-def main_keyboard(is_admin):
+def get_main_keyboard():
+    # القائمة الرئيسية الشاملة للـ Super Admin
     buttons = [
-        [InlineKeyboardButton("إضافة رقم", callback_data="add_num"), InlineKeyboardButton("أرقامي", callback_data="my_numbers")],
-        [InlineKeyboardButton("تسجيل جلسة", callback_data="reg_session"), InlineKeyboardButton("إنشاء جلسة", callback_data="create_session")],
-        [InlineKeyboardButton("انضمام لمجلد", callback_data="join_folder"), InlineKeyboardButton("انضمام لقناة", callback_data="join_channel")],
-        [InlineKeyboardButton("تشغيل بوت", callback_data="run_bot"), InlineKeyboardButton("تفاعل", callback_data="react")],
-        [InlineKeyboardButton("مغادرة قناة", callback_data="leave_channel")]
+        [Button.inline("⚙️ لوحة التحكم", b"admin_panel"), Button.inline("📊 الإحصائيات", b"stats")],
+        [Button.inline("➕ إضافة رقم", b"add_number"), Button.inline("➖ حذف رقم", b"delete_number")],
+        [Button.inline("📂 تسجيل عبر ملف جلسات", b"session_login"), Button.inline("📁 إنشاء ملف جلسات", b"create_session")],
+        [Button.inline("🔗 تشغيل عبر رابط إحالة", b"ref_link"), Button.inline("➕ انضمام لقناة/مجموعة", b"join_chat")],
+        [Button.inline("➖ مغادرة قناة/مجموعة", b"leave_chat"), Button.inline("📂 انضمام لمجلد قنوات", b"join_folder")],
+        [Button.inline("❤️ تفاعل رياكشن", b"send_reaction"), Button.inline("💎 تفعيل اشتراك (ID)", b"activate_sub")],
+        [Button.inline("👥 قائمة المشتركين", b"list_subs"), Button.inline("👤 إدارة المشرفين", b"manage_admins")],
+        [Button.inline("📢 الإذاعة والتوجيه", b"broadcast")]
     ]
-    if is_admin:
-        buttons.insert(0, [InlineKeyboardButton("لوحة التحكم", callback_data="admin_panel")])
-    return InlineKeyboardMarkup(buttons)
+    return buttons
 
-def admin_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("تفعيل اشتراك", callback_data="sub_act"), InlineKeyboardButton("المشتركين", callback_data="subs_list")],
-        [InlineKeyboardButton("إرسال لمستخدم", callback_data="send_user"), InlineKeyboardButton("إرسال للكل", callback_data="send_all")],
-        [InlineKeyboardButton("الإحصائيات", callback_data="stats"), InlineKeyboardButton("العودة للرئيسية", callback_data="home")]
-    ])
-
-def my_numbers_keyboard(user_phones):
-    buttons = []
-    for row in user_phones:
-        buttons.append([InlineKeyboardButton(f"حذف: {row[1]}", callback_data=f"del_phone_{row[0]}")])
-    buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="home")])
-    return InlineKeyboardMarkup(buttons)
-
-def back_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 رجوع", callback_data="home")]
-    ])
+def get_back_keyboard():
+    # زر الرجوع الثابت لأي قائمة فرعية
+    return [[Button.inline("🔙 رجوع للقائمة الرئيسية", b"back_home")]]

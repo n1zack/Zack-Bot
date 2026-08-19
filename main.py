@@ -1,28 +1,15 @@
-import asyncio
-import sys
-
-# إنشاء حلقة أحداث مسبقة وإجبار بايثون عليها لتتوافق مع Pyrogram تماماً
-try:
-    loop = asyncio.get_event_loop()
-except RuntimeError:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-import threading
+import os
 import logging
 from pyrogram import Client
 from aiohttp import web
-from aiohttp.web import Response
 import config
 from database import init_db
 
 # إعداد التسجيل
 logging.basicConfig(level=logging.INFO)
-
-# تهيئة قاعدة البيانات عند بدء التشغيل
 init_db()
 
-# إنشاء عميل البوت
+# إعداد البوت
 app = Client(
     "SuperAdminBot",
     api_id=config.API_ID,
@@ -30,22 +17,22 @@ app = Client(
     bot_token=config.BOT_TOKEN
 )
 
-# إعداد سيرفر الويب الوهمي لإرضاء Render
-web_app = web.Application()
+# إعداد سيرفر الويب الذي يطلبه Render
 async def handle(request):
-    return Response(text="Bot is running and active!")
+    return web.Response(text="Bot is active!")
 
-web_app.add_routes([web.get('/', handle)])
-
-def run_web_server():
-    web.run_app(web_app, host='0.0.0.0', port=10000, print=None)
+app_web = web.Application()
+app_web.add_routes([web.get('/', handle)])
 
 if __name__ == "__main__":
-    # تشغيل سيرفر الويب في خلفية منفصلة
-    server_thread = threading.Thread(target=run_web_server, daemon=True)
-    server_thread.start()
-    logging.info("Web server started in background.")
-
-    # تشغيل بوت تيليجرام
-    logging.info("Starting Telegram Bot...")
-    app.run()
+    # تشغيل البوت مع السيرفر باستخدام خاصية compose من pyrogram
+    # هذه الطريقة هي الأكثر استقراراً على السيرفرات
+    logging.info("Starting Bot and Web Server...")
+    
+    # تشغيل السيرفر على البورت 10000
+    port = int(os.environ.get("PORT", 10000))
+    
+    # ربط البوت بالدورة التشغيلية
+    app.start()
+    web.run_app(app_web, host='0.0.0.0', port=port)
+ 

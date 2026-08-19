@@ -1,31 +1,11 @@
-from aiohttp import web
-
-# أضف هذا الجزء في نهاية ملف main.py قبل التشغيل
-async def handle(request):
-    return web.Response(text="Bot is running!")
-
-app_web = web.Application()
-app_web.add_routes([web.get('/', handle)])
-
-# في نهاية الملف عند التشغيل
-if __name__ == "__main__":
-    # هذا يضمن تشغيل سيرفر الويب بجانب البوت
-    import asyncio
-    runner = web.AppRunner(app_web)
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(runner.setup())
-    site = web.TCPSite(runner, '0.0.0.0', 10000)
-    loop.run_until_complete(site.start())
-    app.run()
-
+import asyncio
 import logging
-from pyrogram import Client, filters
+from pyrogram import Client
+from aiohttp import web
 import config
 from database import init_db
-from keyboards import main_keyboard, back_keyboard
-from handlers.user_actions import handle_session_file
-from handlers.callbacks import handle_callback_query
 
+# إعداد التسجيل
 logging.basicConfig(level=logging.INFO)
 
 # تهيئة قاعدة البيانات عند بدء التشغيل
@@ -38,55 +18,23 @@ app = Client(
     bot_token=config.BOT_TOKEN
 )
 
-@app.on_message(filters.command("start"))
-async def start_command(client, message):
-    user_id = message.from_user.id
-    is_admin = (user_id == config.ADMIN_ID)
-    await message.reply_text(
-        f"مرحباً بك يا {message.from_user.first_name}.\nالبوت جاهز ويعمل بكفاءة تامة ومعلوماتك منعزلة بأمان.",
-        reply_markup=main_keyboard(is_admin)
-    )
+# سيرفر ويب وهمي لإرضاء Render فقط
+async def handle(request):
+    return web.Response(text="Bot is running!")
 
-@app.on_message(filters.document)
-async def document_handler(client, message):
-    await handle_session_file(client, message)
+async def start_web_server():
+    web_app = web.Application()
+    web_app.add_routes([web.get('/', handle)])
+    runner = web.AppRunner(web_app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 10000)
+    await site.start()
 
-@app.on_callback_query()
-async def callback_handler(client, callback_query):
-    user_id = callback_query.from_user.id
-    data = callback_query.data
-    
-    if data == "home":
-        is_admin = (user_id == config.ADMIN_ID)
-        await callback_query.message.edit_text("القائمة الرئيسية:", reply_markup=main_keyboard(is_admin))
-    elif data == "admin_panel":
-        if user_id == config.ADMIN_ID:
-            from keyboards import admin_keyboard
-            await callback_query.message.edit_text("لوحة التحكم الخاصة بك:", reply_markup=admin_keyboard())
-        else:
-            await callback_query.answer("عذراً، هذه اللوحة مخصصة للآدمن فقط!", show_alert=True)
-    elif data == "my_numbers":
-        from database import get_user_phones
-        from keyboards import my_numbers_keyboard
-        phones = get_user_phones(user_id)
-        if not phones:
-            await callback_query.message.edit_text("ليس لديك أي أرقام مسجلة.", reply_markup=back_keyboard())
-        else:
-            await callback_query.message.edit_text("أرقامك المسجلة (اضغط على الزر للحذف الفوري):", reply_markup=my_numbers_keyboard(phones))
-    elif data.startswith("del_phone_"):
-        from database import delete_phone_by_id, get_user_phones
-        from keyboards import my_numbers_keyboard
-        phone_id = int(data.split("_")[2])
-        delete_phone_by_id(phone_id, user_id)
-        phones = get_user_phones(user_id)
-        await callback_query.answer("تم حذف الرقم بنجاح!", show_alert=True)
-        if not phones:
-            await callback_query.message.edit_text("ليس لديك أي أرقام مسجلة.", reply_markup=back_keyboard())
-        else:
-            await callback_query.message.edit_text("أرقامك المسجلة:", reply_markup=my_numbers_keyboard(phones))
-    else:
-        await callback_query.answer("تم النقر بنجاح", show_alert=False)
+async def main():
+    await start_web_server()
+    await app.start()
+    print("Bot is started successfully!")
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    print("Bot is starting...")
-    app.run()
+    asyncio.run(main())

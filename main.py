@@ -1,16 +1,8 @@
-import asyncio
-import sys
-
-# حل مشكلة حلقة الأحداث في بايثون الحديثة لـ Pyrogram
-try:
-    asyncio.get_event_loop()
-except RuntimeError:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
+import threading
 import logging
 from pyrogram import Client
 from aiohttp import web
+from aiohttp.web import Response
 import config
 from database import init_db
 
@@ -20,6 +12,7 @@ logging.basicConfig(level=logging.INFO)
 # تهيئة قاعدة البيانات عند بدء التشغيل
 init_db()
 
+# إنشاء عميل البوت
 app = Client(
     "SuperAdminBot",
     api_id=config.API_ID,
@@ -27,20 +20,23 @@ app = Client(
     bot_token=config.BOT_TOKEN
 )
 
+# إعداد سيرفر الويب الوهمي لإرضاء Render
+web_app = web.Application()
 async def handle(request):
-    return web.Response(text="Bot is running!")
+    return Response(text="Bot is running and active!")
 
-async def start_web():
-    web_app = web.Application()
-    web_app.add_routes([web.get('/', handle)])
-    runner = web.AppRunner(web_app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 10000)
-    await site.start()
+web_app.add_routes([web.get('/', handle)])
+
+def run_web_server():
+    # تشغيل سيرفر الويب على المنفذ 10000 بشكل منفصل
+    web.run_app(web_app, host='0.0.0.0', port=10000, print=None)
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_web())
-    
+    # تشغيل سيرفر الويب في خلفية منفصلة (Thread)
+    server_thread = threading.Thread(target=run_web_server, daemon=True)
+    server_thread.start()
+    logging.info("Web server started in background.")
+
+    # تشغيل بوت تيليجرام بشكل أساسي
     logging.info("Starting Telegram Bot...")
     app.run()

@@ -208,24 +208,25 @@ async def callback_handler(event):
             
             await event.edit("⏳ جاري إنشاء ملف الجلسات الخاص بك...")
             zip_filename = f"my_sessions_{user_id}.zip"
+            
             with zipfile.ZipFile(zip_filename, 'w') as zipf:
                 for phone in nums:
                     s_str = get_session_string(user_id, phone)
                     if s_str:
-                        temp_filename = f"{phone.replace('+', '')}.session"
-                        temp_client = TelegramClient(StringSession(s_str), API_ID, API_HASH)
-                        async with temp_client:
-                            pass
-                        if os.path.exists(temp_filename):
-                            zipf.write(temp_filename)
-                            os.remove(temp_filename)
+                        clean_phone = phone.replace('+', '')
+                        txt_filename = f"{clean_phone}.txt"
+                        # حفظ سلسلة الجلسة (StringSession) داخل ملف نصي لكي يقبله البوت عند إعادة رفعه
+                        with open(txt_filename, "w", encoding="utf-8") as f:
+                            f.write(s_str)
+                        zipf.write(txt_filename)
+                        os.remove(txt_filename)
             
             if os.path.exists(zip_filename):
                 await event.respond(file=zip_filename)
                 os.remove(zip_filename)
-                await event.edit("✅ **تم تصدير ملفات الجلسات بنجاح!**", buttons=get_back_keyboard())
+                await event.edit("✅ **تم تصدير ملفات الجلسات بنجاح!** (تم حفظها بصيغة نصية سليمة قابلة للاستيراد لاحقاً)", buttons=get_back_keyboard())
             else:
-                await event.edit("❌ لم يتم العثور على بيانات جلسات نصية مرتبطة بأرقامك.", buttons=get_back_keyboard())
+                await event.edit("❌ لم يتم العثور على بيانات جلسات مرتبطة بأرقامك.", buttons=get_back_keyboard())
 
         elif data == "ref_bot":
             await event.answer()
@@ -307,17 +308,31 @@ async def handle_session_file(event):
                         if file.endswith('.session') or file.endswith('.txt'):
                             file_path = os.path.join(root, file)
                             try:
-                                temp_client = TelegramClient(file_path, API_ID, API_HASH)
-                                await temp_client.connect()
-                                if await temp_client.is_user_authorized():
-                                    me = await temp_client.get_me()
-                                    if me and me.phone:
-                                        p_str = "+" + str(me.phone)
+                                session_string = ""
+                                if file.endswith('.txt'):
+                                    with open(file_path, "r", encoding="utf-8") as rf:
+                                        session_string = rf.read().strip()
+                                else:
+                                    # قراءة ملفات الجلسة القديمة إن وجدت
+                                    temp_client = TelegramClient(file_path, API_ID, API_HASH)
+                                    await temp_client.connect()
+                                    if await temp_client.is_user_authorized():
                                         session_string = temp_client.session.save()
-                                        add_user_number(user_id, p_str, session_string)
-                                        success_numbers.append(p_str)
-                                await temp_client.disconnect()
-                            except: pass
+                                    await temp_client.disconnect()
+
+                                if session_string:
+                                    # التحقق من صلاحية StringSession واستخراج رقم الهاتف المرتبط بها
+                                    verify_client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
+                                    await verify_client.connect()
+                                    if await verify_client.is_user_authorized():
+                                        me = await verify_client.get_me()
+                                        if me and me.phone:
+                                            p_str = "+" + str(me.phone)
+                                            add_user_number(user_id, p_str, session_string)
+                                            success_numbers.append(p_str)
+                                    await verify_client.disconnect()
+                            except Exception as ex:
+                                logger.error(f"Error parsing session file {file}: {ex}")
             import shutil
             if os.path.exists(extract_dir):
                 shutil.rmtree(extract_dir)
@@ -501,7 +516,7 @@ async def main():
     asyncio.create_task(keep_alive())
     
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with 2FA support.")
+    logger.info("Zack-Bot started successfully with fixed export/import sessions.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

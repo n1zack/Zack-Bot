@@ -1,12 +1,18 @@
 import os
 import logging
 from aiohttp import web
-import config
-from database import init_db
 from pyrogram import Client
+from database import init_db
 
+# إعداد التسجيل وقاعدة البيانات
 logging.basicConfig(level=logging.INFO)
 init_db()
+
+# بيانات البوت مباشرة هنا لضمان عدم حدوث أي خطأ
+BOT_TOKEN = '8545427199:AAG5hZC0DypVhE8xFuwOOEWrqwuirh_hutc'
+API_ID = 31470691  
+API_HASH = '5c3f24ee62d7a7e46601a53f571f62cc'
+ADMIN_ID = 1251313339
 
 # إعداد سيرفر الويب لـ Render
 async def handle(request):
@@ -26,13 +32,13 @@ async def start_web_server():
 # إعداد بوت تيليجرام
 app = Client(
     "SuperAdminBot",
-    api_id=config.API_ID,
-    api_hash=config.API_HASH,
-    bot_token=config.BOT_TOKEN
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN
 )
 
 if __name__ == "__main__":
-    # تشغيل سيرفر الويب مع حلقة الأحداث الخاصة بالبوت
+    # تشغيل سيرفر الويب بالتزامن مع البوت
     loop = app.loop
     loop.run_until_complete(start_web_server())
     

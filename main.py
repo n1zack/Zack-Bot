@@ -4,12 +4,19 @@ import zipfile
 import asyncio
 import datetime
 from aiohttp import web
-from telethon import TelegramClient, events
+from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError
+from telethon.tl.functions.messages import ImportChatInviteRequest, StartBotRequest
+from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest
+from telethon.tl.functions.chatlists import JoinChatlistInviteRequest, CheckChatlistInviteRequest
 from database import init_db, add_user_number, get_user_numbers, delete_user_number, add_subscriber, get_subscribers, is_subscribed
 from keyboards import get_main_keyboard, get_admin_panel_keyboard, get_back_keyboard
 
-logging.basicConfig(level=logging.INFO)
+# إعدادات التسجيل
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# تهيئة قاعدة البيانات
 init_db()
 
 # ================= بياناتك الثابتة المعتمدة =================
@@ -23,7 +30,7 @@ user_states = {}
 
 # سيرفر الويب لضمان بقاء البوت نشطاً على Render
 async def handle(request):
-    return web.Response(text="Zack-Bot is running successfully!")
+    return web.Response(text="Zack-Bot is running and fully operational!")
 
 app_web = web.Application()
 app_web.add_routes([web.get('/', handle)])
@@ -34,16 +41,10 @@ async def start_web_server():
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
-    logging.info(f"Web server started on port {port}.")
+    logger.info(f"Web server started on port {port}.")
 
+# تهيئة عميل التيليجرام الأساسي للبوت
 client = TelegramClient('zack_bot', API_ID, API_HASH)
-
-# دالة مساعدة للتحقق من الاشتراك وإظهار رسالة التواصل بك
-async def check_auth_and_respond(event, user_id):
-    if user_id == ADMIN_ID or is_subscribed(user_id):
-        return True
-    await event.respond("⚠️ عذراً، أنت غير مشترك في البوت.\nقم بالتواصل مع @n1zack لتفعيل اشتراكك.")
-    return False
 
 # --- أمر /start ---
 @client.on(events.NewMessage(pattern='/start'))
@@ -190,8 +191,9 @@ async def handle_session_file(event):
                     for file in files:
                         if file.endswith('.session') or file.endswith('.txt'):
                             file_path = os.path.join(root, file)
+                            session_name_prefix = os.path.join(extract_dir, file.replace('.session', '').replace('.txt', ''))
                             try:
-                                sess_client = TelegramClient(file_path.replace('.session', '').replace('.txt', ''), API_ID, API_HASH)
+                                sess_client = TelegramClient(session_name_prefix, API_ID, API_HASH)
                                 await sess_client.connect()
                                 if await sess_client.is_user_authorized():
                                     me = await sess_client.get_me()
@@ -205,7 +207,8 @@ async def handle_session_file(event):
         
         elif filename.endswith('.session') or filename.endswith('.txt') or path.endswith('.session') or path.endswith('.txt'):
             try:
-                sess_client = TelegramClient(path.replace('.session', '').replace('.txt', ''), API_ID, API_HASH)
+                base_name = path.replace('.session', '').replace('.txt', '')
+                sess_client = TelegramClient(base_name, API_ID, API_HASH)
                 await sess_client.connect()
                 if await sess_client.is_user_authorized():
                     me = await sess_client.get_me()
@@ -217,12 +220,11 @@ async def handle_session_file(event):
             except Exception as e:
                 failed_reasons.append(f"الملف الفردي: {str(e)}")
 
-        # إرسال تقرير النتيجة المفصل
         report = "📊 **تقرير معالجة ملفات الجلسات:**\n\n"
         if success_numbers:
             report += f"✅ **تمت الإضافة بنجاح للأرقام التالية:**\n" + "\n".join([f"- `{n}`" for n in success_numbers]) + "\n\n"
         else:
-            report += "⚠️ لم يتم العثور على أرقام نشطة صالحة للإضافة.\n\n"
+            report += "⚠️ لم يتم العثور على أرقام نشطة صالحة للإضافة أو فشلت الجلسة.\n\n"
             
         if failed_reasons:
             report += f"❌ **أسباب الفشل لبعض الملفات:**\n" + "\n".join([f"- `{r}`" for r in failed_reasons])
@@ -251,14 +253,12 @@ async def handle_user_messages(event):
     # 1. تفعيل الاشتراك عبر الآيدي (للمشرف فقط)
     if action == "waiting_for_sub" and user_id == ADMIN_ID:
         try:
-            # الصيغة المتوقعة: ID 123456 5 d
             parts = text.split()
             if parts[0].upper() == "ID" and parts[-1].lower() == "d":
                 target_user_id = int(parts[1])
                 days = int(parts[2])
                 expiry = add_subscriber(target_user_id, days)
                 
-                # إرسال إشعار للمستخدم
                 try:
                     await client.send_message(
                         target_user_id, 
@@ -301,6 +301,7 @@ async def handle_user_messages(event):
         try:
             await temp_client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
             add_user_number(user_id, phone)
+            await temp_client.disconnect()
             await event.respond("🎉 **تم تسجيل الدخول وحفظ الرقم في قائمتك الخاصة بنجاح! ✅**")
             user_states.pop(user_id, None)
         except SessionPasswordNeededError:
@@ -317,6 +318,7 @@ async def handle_user_messages(event):
         try:
             await temp_client.sign_in(password=password)
             add_user_number(user_id, phone)
+            await temp_client.disconnect()
             await event.respond("🎉 **تم تخطي التحقق بخطوتين وحفظ الحساب بنجاح تام! 🔒**")
             user_states.pop(user_id, None)
         except Exception as e:
@@ -329,15 +331,72 @@ async def handle_user_messages(event):
         await event.respond(f"🗑️ تمت محاولة حذف الرقم `{phone_to_delete}` من قائمتك.")
         user_states.pop(user_id, None)
 
-    # 4. باقي الأقسام (إحالة، انضمام، مغادرة، مجلدات)
+    # 4. معالجة روابط العمليات الفعليّة (إنضمام، مغادرة، مجلدات، إحالة)
     elif action in ["waiting_for_ref", "waiting_for_join", "waiting_for_leave", "waiting_for_folder"]:
-        await event.respond(f"✅ تم استلام الرابط بنجاح وجاري تنفيذ الطلب على حساباتك المسجلة.")
+        link = text
+        user_numbers_list = get_user_numbers(user_id)
+        
+        if not user_numbers_list:
+            await event.respond("⚠️ لا توجد لديك أي أرقام/حسابات مسجلة لتنفيذ هذه العملية. قم بإضافة أرقامك أو ملفات جلساتك أولاً.")
+            user_states.pop(user_id, None)
+            return
+
+        await event.respond(f"⏳ جاري تنفيذ العملية على عدد `{len(user_numbers_list)}` من حساباتك المسجلة...")
+        
+        success_count = 0
+        fail_count = 0
+
+        for phone in user_numbers_list:
+            try:
+                # البحث عن الجلسة الخاصة بالحساب
+                session_name = f"session_{user_id}_{phone.replace('+', '')}"
+                if not os.path.exists(session_name + ".session"):
+                    # البحث في مجلد المستخلصات أو الجلسات العامة
+                    session_name = phone.replace('+', '')
+                
+                async with TelegramClient(session_name, API_ID, API_HASH) as acc:
+                    if action == "waiting_for_join":
+                        if "+" in link or "joinchat" in link:
+                            invite_hash = link.split("/")[-1].replace("+", "")
+                            await acc(ImportChatInviteRequest(invite_hash))
+                        else:
+                            channel_username = link.split("/")[-1].replace("@", "")
+                            await acc(JoinChannelRequest(channel_username))
+                            
+                    elif action == "waiting_for_leave":
+                        channel_username = link.split("/")[-1].replace("@", "")
+                        await acc(LeaveChannelRequest(channel_username))
+
+                    elif action == "waiting_for_ref":
+                        parts = link.split("/")
+                        bot_username = parts[-1].split("?")[0].replace("@", "")
+                        param = ""
+                        if "start=" in link:
+                            param = link.split("start=")[1].split("&")[0]
+                        await acc(StartBotRequest(bot=bot_username, peer=bot_username, start_param=param))
+
+                    elif action == "waiting_for_folder":
+                        if "addlist" in link:
+                            slug = link.split("addlist/")[-1]
+                            invite = await acc(CheckChatlistInviteRequest(slug=slug))
+                            await acc(JoinChatlistInviteRequest(slug=slug, peers=invite.peers))
+
+                    success_count += 1
+            except Exception as ex:
+                fail_count += 1
+
+        await event.respond(
+            f"📊 **نتيجة تنفيذ العملية:**\n\n"
+            f"✅ نجحت مع `{success_count}` حساب.\n"
+            f"❌ فشلت مع `{fail_count}` حساب.\n"
+            f"الرابط المعالج: `{link}`"
+        )
         user_states.pop(user_id, None)
 
 async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
-    logging.info("Zack-Bot started successfully with full features.")
+    logger.info("Zack-Bot started successfully with full features.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

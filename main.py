@@ -1,7 +1,7 @@
 import asyncio
 import sys
 
-# إنشاء حلقة أحداث مسبقة لتجنب خطأ Pyrogram مع Python 3.14
+# ضمان توافق حلقة الأحداث مع بايثون الحديثة
 try:
     loop = asyncio.get_event_loop()
 except RuntimeError:
@@ -9,8 +9,10 @@ except RuntimeError:
     asyncio.set_event_loop(loop)
 
 import os
+import threading
 import logging
 from aiohttp import web
+from pyrogram import Client
 import config
 from database import init_db
 
@@ -25,10 +27,18 @@ async def handle(request):
 app_web = web.Application()
 app_web.add_routes([web.get('/', handle)])
 
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    web.run_app(app_web, host='0.0.0.0', port=port, print=None)
+
 if __name__ == "__main__":
-    # استيراد وتشكيل عميل Pyrogram بعد تثبيت حلقة الأحداث
-    from pyrogram import Client
-    
+    # 1. تشغيل سيرفر الويب في الخلفية ليبقى المنفذ مفتوحاً دائماً أمام Render
+    server_thread = threading.Thread(target=run_web_server, daemon=True)
+    server_thread.start()
+    logging.info("Web server started successfully in background.")
+
+    # 2. تشغيل عميل بوت تيليجرام ليعمل بشكل أساسي ومستمر
+    logging.info("Starting Telegram Bot...")
     app = Client(
         "SuperAdminBot",
         api_id=config.API_ID,
@@ -36,12 +46,5 @@ if __name__ == "__main__":
         bot_token=config.BOT_TOKEN
     )
     
-    logging.info("Starting Telegram Bot & Web Server...")
-    
-    # تشغيل البوت بطريقة غير متزامنة لتجنب تعارض الـ Threads
-    app.start()
-    
-    # تشغيل سيرفر الويب على المنفذ المطلوب
-    port = int(os.environ.get("PORT", 10000))
-    web.run_app(app_web, host='0.0.0.0', port=port, print=None)
- 
+    # تشغيل البوت
+    app.run()

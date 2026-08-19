@@ -413,12 +413,16 @@ async def handle_user_messages(event):
             state = user_states[user_id]
             temp_client = state["temp_client"]
             phone = state["phone"]
-            await temp_client.sign_in(phone=phone, code=text, phone_code_hash=state["phone_code_hash"])
-            session_string = temp_client.session.save()
-            add_user_number(user_id, phone, session_string)
-            await temp_client.disconnect()
-            await event.respond("🎉 تم تسجيل الدخول وحفظ الرقم وجلسته في قاعدة البيانات بنجاح حصرياً لك!")
-            user_states.pop(user_id, None)
+            try:
+                await temp_client.sign_in(phone=phone, code=text, phone_code_hash=state["phone_code_hash"])
+                session_string = temp_client.session.save()
+                add_user_number(user_id, phone, session_string)
+                await temp_client.disconnect()
+                await event.respond("🎉 تم تسجيل الدخول وحفظ الرقم وجلسته في قاعدة البيانات بنجاح حصرياً لك!")
+                user_states.pop(user_id, None)
+            except SessionPasswordNeededError:
+                user_states[user_id]["action"] = "waiting_for_password"
+                await event.respond("🔒 الحساب محمي بالتحقق بخطوتين (كلمة المرور). أرسل كلمة المرور الآن:")
 
         elif action == "waiting_for_password":
             state = user_states[user_id]
@@ -497,7 +501,7 @@ async def main():
     asyncio.create_task(keep_alive())
     
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with custom subscription alert.")
+    logger.info("Zack-Bot started successfully with 2FA support.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

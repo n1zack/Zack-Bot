@@ -1,48 +1,42 @@
 import os
 import asyncio
+import threading
 import logging
 from aiohttp import web
-from pyrogram import Client
 import config
 from database import init_db
 
-# إعداد التسجيل وقاعدة البيانات
+# إعداد التسجيل
 logging.basicConfig(level=logging.INFO)
 init_db()
 
-# إعداد البوت
-app = Client(
-    "SuperAdminBot",
-    api_id=config.API_ID,
-    api_hash=config.API_HASH,
-    bot_token=config.BOT_TOKEN
-)
-
-# سيرفر الويب المطلوب من Render
+# إعداد سيرفر الويب لـ Render
 async def handle(request):
     return web.Response(text="Zack-Bot is running successfully!")
 
 web_app = web.Application()
 web_app.add_routes([web.get('/', handle)])
 
-async def main():
-    # بدء تشغيل البوت بشكل غير متزامن
-    await app.start()
-    logging.info("Telegram Bot started successfully.")
-    
-    # إعداد وبدء سيرفر الويب على المنفذ المطلوب من Render
+def run_web_server():
     port = int(os.environ.get("PORT", 10000))
-    runner = web.AppRunner(web_app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', port)
-    await site.start()
-    logging.info(f"Web server started on port {port}.")
+    web.run_app(web_app, host='0.0.0.0', port=port, print=None)
 
 if __name__ == "__main__":
-    # تشغيل حلقة الأحداث الأساسية
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(main())
-        loop.run_forever()
-    except KeyboardInterrupt:
-        pass
+    # تشغيل سيرفر الويب في الخلفية ليظل البورت مفتوحاً
+    server_thread = threading.Thread(target=run_web_server, daemon=True)
+    server_thread.start()
+    logging.info("Web server started in background.")
+
+    # تأخير استيراد وبدء البوت لحين ضمان جاهزية البيئة
+    import pyrogram
+    from pyrogram import Client
+
+    logging.info("Starting Telegram Bot...")
+    app = Client(
+        "SuperAdminBot",
+        api_id=config.API_ID,
+        api_hash=config.API_HASH,
+        bot_token=config.BOT_TOKEN
+    )
+    
+    app.run()

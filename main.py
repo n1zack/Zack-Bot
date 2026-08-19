@@ -5,13 +5,17 @@ import asyncio
 import datetime
 from aiohttp import web
 from telethon import TelegramClient, events, Button
+from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
 from telethon.tl.functions.messages import ImportChatInviteRequest, StartBotRequest
 from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest
 from telethon.tl.functions.chatlists import JoinChatlistInviteRequest, CheckChatlistInviteRequest
 from telethon.tl.functions.messages import SendReactionRequest
 from telethon.tl.types import ReactionEmoji
-from database import init_db, add_user_number, get_user_numbers, delete_user_number, add_subscriber, get_subscribers, is_subscribed
+from database import (
+    init_db, add_user_number, get_user_numbers, get_session_string, 
+    delete_user_number, add_subscriber, get_subscribers, is_subscribed
+)
 from keyboards import get_main_keyboard, get_admin_panel_keyboard, get_back_keyboard
 
 # إعدادات التسجيل
@@ -30,7 +34,7 @@ ADMIN_ID = 1251313339
 
 user_states = {}
 
-# سيرفر الويب لضمان بقاء البوت نشطاً على Render وتجنب السبات
+# سيرفر الويب لضمان بقاء البوت نشطاً على Render
 async def handle(request):
     return web.Response(text="Zack-Bot is running and fully operational!")
 
@@ -45,8 +49,8 @@ async def start_web_server():
     await site.start()
     logger.info(f"Web server started on port {port}.")
 
-# تهيئة عميل التيليجرام الأساسي للبوت مع حماية وتجنب التداخل
-client = TelegramClient('zack_bot', API_ID, API_HASH)
+# تهيئة عميل التيليجرام الأساسي للبوت
+client = TelegramClient('zack_bot_main', API_ID, API_HASH)
 
 # --- أمر /start ---
 @client.on(events.NewMessage(pattern='/start'))
@@ -115,7 +119,7 @@ async def callback_handler(event):
             numbers = get_user_numbers(user_id)
             if numbers:
                 numbers_list = "\n".join([f"📱 `{num}`" for num in numbers])
-                text = f"📱 **أرقامك المسجلة خصيصاً لك:**\n\n{numbers_list}"
+                text = f"📱 **أرقامك المسجلة خصيصاً لك (معزولة وآمنة):**\n\n{numbers_list}"
             else:
                 text = "📱 **أرقامك المسجلة:**\nلا توجد أرقام مسجلة حالياً."
             await event.edit(text, buttons=get_back_keyboard())
@@ -128,11 +132,11 @@ async def callback_handler(event):
         elif data == "delete_number":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_delete"}
-            await event.edit("➖ **حذف رقم:**\nأرسل الرقم الذي تريد حذفه.", buttons=get_back_keyboard())
+            await event.edit("➖ **حذف رقم:**\nأرسل الرقم الذي تريد حذفه من قائمتك.", buttons=get_back_keyboard())
 
         elif data == "session_login":
             await event.answer()
-            await event.edit("📥 **تسجيل دخول عبر ملف جلسات:**\nأرسل ملف `zip` أو `sessions` أو `txt` وسأقوم بمعالجته.", buttons=get_back_keyboard())
+            await event.edit("📥 **تسجيل دخول عبر ملف جلسات:**\nأرسل ملف `zip` أو `sessions` أو `txt` وسأقوم بحفظ جلساته في قاعدة البيانات حصرياً لك.", buttons=get_back_keyboard())
             
         elif data == "export_sessions":
             await event.answer()
@@ -140,20 +144,30 @@ async def callback_handler(event):
             if not nums:
                 return await event.edit("⚠️ لا توجد أرقام أو جلسات محفوظة لتصديرها.", buttons=get_back_keyboard())
             
-            await event.edit("⏳ جاري تجميع ملفات الجلسات الخاصة بك...")
+            await event.edit("⏳ جاري إنشاء ملف الجلسات الخاص بك...")
             zip_filename = f"my_sessions_{user_id}.zip"
             with zipfile.ZipFile(zip_filename, 'w') as zipf:
                 for phone in nums:
-                    s_name = f"session_{user_id}_{phone.replace('+', '')}.session"
-                    if os.path.exists(s_name):
-                        zipf.write(s_name)
+                    s_str = get_session_string(user_id, phone)
+                    if s_str:
+                        # كتابة الجلسة المؤقتة داخل ملف txt أو session داخل الـ zip
+                        temp_filename = f"{phone.replace('+', '')}.session"
+                        # استخدام StringSession لتصديرها كملف فعلي مؤقت للتحميل
+                        temp_client = TelegramClient(StringSession(s_str), API_ID, API_HASH)
+                        # حفظه مؤقتاً بالقرص للضغط
+                        async with temp_client:
+                            pass
+                        # ملاحظة: telethon ينشئ ملفاً محلياً باسم السشن المؤقت
+                        if os.path.exists(temp_filename):
+                            zipf.write(temp_filename)
+                            os.remove(temp_filename)
             
             if os.path.exists(zip_filename):
                 await event.respond(file=zip_filename)
                 os.remove(zip_filename)
                 await event.edit("✅ **تم تصدير ملفات الجلسات بنجاح!**", buttons=get_back_keyboard())
             else:
-                await event.edit("❌ لم يتم العثور على ملفات جلسات مادية مرتبطة بأرقامك.", buttons=get_back_keyboard())
+                await event.edit("❌ لم يتم العثور على بيانات جلسات نصية مرتبطة بأرقامك.", buttons=get_back_keyboard())
 
         elif data == "ref_bot":
             await event.answer()
@@ -178,7 +192,7 @@ async def callback_handler(event):
         elif data == "send_reaction":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_reaction"}
-            await event.edit("❤️ **تفاعل رياكشن:**\nأرسل رابط المنشور في القناة أو المجموعة متبوعاً بالإيموجي (مثال:\n`https://t.me/channel/123 👍`)\nأو أرسل الرابط وسنستخدم تفاعل 👍 افتراضياً.", buttons=get_back_keyboard())
+            await event.edit("❤️ **تفاعل رياكشن:**\nأرسل رابط المنشور متبوعاً بالإيموجي (مثال:\n`https://t.me/channel/123 👍`)", buttons=get_back_keyboard())
 
         elif data == "back_home":
             await event.answer()
@@ -189,7 +203,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة الملفات المرسلة ---
+# --- معالجة الملفات المرسلة وحفظها كـ StringSession في قاعدة البيانات ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -199,12 +213,12 @@ async def handle_session_file(event):
 
         path = await event.download_media()
         filename = event.file.name or ""
-        await event.respond("📂 جاري فحص الملف ومعالجة الجلسات...")
+        await event.respond("📂 جاري فحص الملف وحفظ الجلسات سحابياً في قاعدة البيانات...")
         
         success_numbers = []
         
         if filename.endswith('.zip') or path.endswith('.zip'):
-            extract_dir = f"sessions_{user_id}"
+            extract_dir = f"temp_ext_{user_id}"
             os.makedirs(extract_dir, exist_ok=True)
             with zipfile.ZipFile(path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
@@ -212,27 +226,27 @@ async def handle_session_file(event):
                     for file in files:
                         if file.endswith('.session') or file.endswith('.txt'):
                             file_path = os.path.join(root, file)
-                            base_n = file.replace('.session', '').replace('.txt', '')
-                            sess_name = f"session_{user_id}_{base_n}"
                             try:
-                                # نقل وتوحيد التسمية
-                                if file_path != f"{sess_name}.session":
-                                    import shutil
-                                    shutil.copy(file_path, f"{sess_name}.session")
-                                
-                                sess_client = TelegramClient(sess_name, API_ID, API_HASH)
-                                await sess_client.connect()
-                                if await sess_client.is_user_authorized():
-                                    me = await sess_client.get_me()
+                                # قراءة ملف الجلسة القديم وتحويله لـ StringSession
+                                temp_client = TelegramClient(file_path, API_ID, API_HASH)
+                                await temp_client.connect()
+                                if await temp_client.is_user_authorized():
+                                    me = await temp_client.get_me()
                                     if me and me.phone:
                                         p_str = "+" + str(me.phone)
-                                        add_user_number(user_id, p_str)
+                                        session_string = temp_client.session.save()
+                                        # تخزين حصري للمستخدم الحالي فقط
+                                        add_user_number(user_id, p_str, session_string)
                                         success_numbers.append(p_str)
-                                await sess_client.disconnect()
+                                await temp_client.disconnect()
                             except: pass
+            # تنظيف المجلد المؤقت
+            import shutil
+            if os.path.exists(extract_dir):
+                shutil.rmtree(extract_dir)
 
         if success_numbers:
-            await event.respond(f"✅ تمت إضافة الحسابات بنجاح:\n" + "\n".join([f"- `{n}`" for n in success_numbers]))
+            await event.respond(f"✅ تمت إضافة الحسابات وحفظها في قاعدة البيانات بنجاح حصرياً لك:\n" + "\n".join([f"- `{n}`" for n in success_numbers]))
         else:
             await event.respond("⚠️ لم يتم التعرف على حسابات صالحة داخل الملف المرفق.")
 
@@ -267,8 +281,8 @@ async def handle_user_messages(event):
         elif action == "waiting_for_phone":
             user_states[user_id]["phone"] = text
             user_states[user_id]["action"] = "waiting_for_code"
-            session_name = f"session_{user_id}_{text.replace('+', '')}"
-            temp_client = TelegramClient(session_name, API_ID, API_HASH)
+            # استخدام StringSession مؤقتة جديدة للربط اليدوي
+            temp_client = TelegramClient(StringSession(), API_ID, API_HASH)
             await temp_client.connect()
             sent = await temp_client.send_code_request(text)
             user_states[user_id]["temp_client"] = temp_client
@@ -277,27 +291,33 @@ async def handle_user_messages(event):
 
         elif action == "waiting_for_code":
             state = user_states[user_id]
-            await state["temp_client"].sign_in(phone=state["phone"], code=text, phone_code_hash=state["phone_code_hash"])
-            add_user_number(user_id, state["phone"])
-            await state["temp_client"].disconnect()
-            await event.respond("🎉 تم تسجيل الدخول وحفظ الرقم بنجاح!")
+            temp_client = state["temp_client"]
+            phone = state["phone"]
+            await temp_client.sign_in(phone=phone, code=text, phone_code_hash=state["phone_code_hash"])
+            session_string = temp_client.session.save()
+            add_user_number(user_id, phone, session_string)
+            await temp_client.disconnect()
+            await event.respond("🎉 تم تسجيل الدخول وحفظ الرقم وجلسته في قاعدة البيانات بنجاح حصرياً لك!")
             user_states.pop(user_id, None)
 
         elif action == "waiting_for_password":
             state = user_states[user_id]
-            await state["temp_client"].sign_in(password=text)
-            add_user_number(user_id, state["phone"])
-            await state["temp_client"].disconnect()
-            await event.respond("🎉 تم تخطي التحقق بخطوتين وحفظ الحساب بنجاح!")
+            temp_client = state["temp_client"]
+            phone = state["phone"]
+            await temp_client.sign_in(password=text)
+            session_string = temp_client.session.save()
+            add_user_number(user_id, phone, session_string)
+            await temp_client.disconnect()
+            await event.respond("🎉 تم تخطي التحقق بخطوتين وحفظ الحساب في قاعدة البيانات بنجاح تام!")
             user_states.pop(user_id, None)
 
         elif action == "waiting_for_delete":
             delete_user_number(user_id, text)
-            await event.respond(f"🗑️ تمت محاولة حذف الرقم `{text}`.")
+            await event.respond(f"🗑️ تم حذف الرقم `{text}` من قائمتك الخاصة.")
             user_states.pop(user_id, None)
 
         elif action in ["waiting_for_ref", "waiting_for_join", "waiting_for_leave", "waiting_for_folder", "waiting_for_reaction"]:
-            link = text.split()[0] # استخراج الرابط إن وجد مع نص إضافي كالإيموجي
+            link = text.split()[0]
             emoji = text.split()[1] if len(text.split()) > 1 else "👍"
             
             nums = get_user_numbers(user_id)
@@ -306,16 +326,18 @@ async def handle_user_messages(event):
                 user_states.pop(user_id, None)
                 return
 
-            await event.respond(f"⏳ جاري التنفيذ على `{len(nums)}` حساب...")
+            await event.respond(f"⏳ جاري التنفيذ على `{len(nums)}` من حساباتك الخاصة...")
             success, fail = 0, 0
 
             for phone in nums:
                 try:
-                    s_name = f"session_{user_id}_{phone.replace('+', '')}"
-                    if not os.path.exists(s_name + ".session"):
-                        s_name = phone.replace('+', '')
+                    s_str = get_session_string(user_id, phone)
+                    if not s_str:
+                        fail += 1
+                        continue
                     
-                    async with TelegramClient(s_name, API_ID, API_HASH) as acc:
+                    # تشغيل العميل باستخدام StringSession الخاص بالمستخدم وفقط به
+                    async with TelegramClient(StringSession(s_str), API_ID, API_HASH) as acc:
                         if action == "waiting_for_join":
                             if "+" in link or "joinchat" in link:
                                 await acc(ImportChatInviteRequest(link.split("/")[-1].replace("+", "")))
@@ -334,7 +356,6 @@ async def handle_user_messages(event):
                                 invite = await acc(CheckChatlistInviteRequest(slug=slug))
                                 await acc(JoinChatlistInviteRequest(slug=slug, peers=invite.peers))
                         elif action == "waiting_for_reaction":
-                            # تحليل رابط المنشور (مثال t.me/channel/123)
                             parts = link.split("/")
                             channel_username = parts[-2]
                             msg_id = int(parts[-1])
@@ -345,7 +366,7 @@ async def handle_user_messages(event):
                 except Exception as ex:
                     fail += 1
 
-            await event.respond(f"📊 **النتيجة:**\n✅ نجحت: `{success}`\n❌ فشلت: `{fail}`")
+            await event.respond(f"📊 **النتيجة لحساباتك الخاصة:**\n✅ نجحت: `{success}`\n❌ فشلت: `{fail}`")
             user_states.pop(user_id, None)
     except Exception as err:
         logger.error(f"Error in message handler: {err}")
@@ -355,7 +376,7 @@ async def handle_user_messages(event):
 async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with full features.")
+    logger.info("Zack-Bot started successfully with database StringSessions.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

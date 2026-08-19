@@ -9,6 +9,8 @@ from telethon.errors import SessionPasswordNeededError
 from telethon.tl.functions.messages import ImportChatInviteRequest, StartBotRequest
 from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest
 from telethon.tl.functions.chatlists import JoinChatlistInviteRequest, CheckChatlistInviteRequest
+from telethon.tl.functions.messages import SendReactionRequest
+from telethon.tl.types import ReactionEmoji
 from database import init_db, add_user_number, get_user_numbers, delete_user_number, add_subscriber, get_subscribers, is_subscribed
 from keyboards import get_main_keyboard, get_admin_panel_keyboard, get_back_keyboard
 
@@ -28,7 +30,7 @@ ADMIN_ID = 1251313339
 
 user_states = {}
 
-# سيرفر الويب لضمان بقاء البوت نشطاً على Render
+# سيرفر الويب لضمان بقاء البوت نشطاً على Render وتجنب السبات
 async def handle(request):
     return web.Response(text="Zack-Bot is running and fully operational!")
 
@@ -43,145 +45,164 @@ async def start_web_server():
     await site.start()
     logger.info(f"Web server started on port {port}.")
 
-# تهيئة عميل التيليجرام الأساسي للبوت
+# تهيئة عميل التيليجرام الأساسي للبوت مع حماية وتجنب التداخل
 client = TelegramClient('zack_bot', API_ID, API_HASH)
 
 # --- أمر /start ---
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
-    user_id = event.sender_id
-    user_states.pop(user_id, None)
-    is_admin = (user_id == ADMIN_ID)
-    
-    welcome_text = (
-        f"👑 **مرحباً بك يا زاك في لوحة تحكم البوت الشاملة**\n"
-        f"معرفك (ID): `{user_id}`\n\n"
-        "اختر العملية المطلوبة لإدارة الحسابات والجلسات والأرقام:"
-    )
-    await event.respond(welcome_text, buttons=get_main_keyboard(is_admin))
+    try:
+        user_id = event.sender_id
+        user_states.pop(user_id, None)
+        is_admin = (user_id == ADMIN_ID)
+        
+        welcome_text = (
+            f"👑 **مرحباً بك يا زاك في لوحة تحكم البوت الشاملة**\n"
+            f"معرفك (ID): `{user_id}`\n\n"
+            "اختر العملية المطلوبة لإدارة الحسابات والجلسات والأرقام:"
+        )
+        await event.respond(welcome_text, buttons=get_main_keyboard(is_admin))
+    except Exception as e:
+        logger.error(f"Error in start command: {e}")
 
 # --- معالجة الأزرار الشفافة ---
 @client.on(events.CallbackQuery)
 async def callback_handler(event):
-    data = event.data.decode('utf-8')
-    user_id = event.sender_id
-    
-    # التحقق من الاشتراك للأقسام العادية (باستثناء المشرف أو العودة للرئيسية)
-    if data not in ["back_home", "admin_panel"] and user_id != ADMIN_ID and not is_subscribed(user_id):
-        await event.answer("⚠️ اشتراكك منتهٍ أو غير مفعل!", alert=True)
-        await event.edit("⚠️ عذراً، أنت غير مشترك في البوت.\nقم بالتواصل مع @n1zack لتفعيل اشتراكك.", buttons=get_back_keyboard())
-        return
-
-    if data == "admin_panel":
-        if user_id != ADMIN_ID:
-            await event.answer("هذا القسم مخصص للمشرف فقط!", alert=True)
+    try:
+        data = event.data.decode('utf-8')
+        user_id = event.sender_id
+        
+        if data not in ["back_home", "admin_panel"] and user_id != ADMIN_ID and not is_subscribed(user_id):
+            await event.answer("⚠️ اشتراكك منتهٍ أو غير مفعل!", alert=True)
+            await event.edit("⚠️ عذراً، أنت غير مشترك في البوت.\nقم بالتواصل مع @n1zack لتفعيل اشتراكك.", buttons=get_back_keyboard())
             return
-        await event.answer()
-        await event.edit("⚙️ **لوحة التحكم والإدارة:**\nاختر القسم المطلوب:", buttons=get_admin_panel_keyboard())
 
-    elif data == "sub_user":
-        if user_id != ADMIN_ID: return
-        user_states[user_id] = {"action": "waiting_for_sub"}
-        await event.answer()
-        await event.edit(
-            "✅ **تفعيل اشتراك مستخدم:**\n"
-            "أرسل البيانات بالصيغة التالية:\n`ID [رقم_الايدي] [عدد_الأيام] d`\n\n"
-            "مثال: `ID 123456789 5 d`", buttons=get_back_keyboard()
-        )
+        if data == "admin_panel":
+            if user_id != ADMIN_ID:
+                await event.answer("هذا القسم مخصص للمشرف فقط!", alert=True)
+                return
+            await event.answer()
+            await event.edit("⚙️ **لوحة التحكم والإدارة:**\nاختر القسم المطلوب:", buttons=get_admin_panel_keyboard())
 
-    elif data == "list_subs":
-        if user_id != ADMIN_ID: return
-        subs = get_subscribers()
-        if subs:
-            text = "👥 **قائمة المشتركين الحاليين:**\n\n"
-            for sub in subs:
-                text += f"👤 ID: `{sub[0]}` | ⏳ ينتهي في: `{sub[1]}`\n"
-        else:
-            text = "👥 **قائمة المشتركين:**\nلا توجد اشتراكات مسجلة حالياً."
-        await event.answer()
-        await event.edit(text, buttons=get_back_keyboard())
+        elif data == "sub_user":
+            if user_id != ADMIN_ID: return
+            user_states[user_id] = {"action": "waiting_for_sub"}
+            await event.answer()
+            await event.edit(
+                "✅ **تفعيل اشتراك مستخدم:**\n"
+                "أرسل البيانات بالصيغة التالية:\n`ID [رقم_الايدي] [عدد_الأيام] d`\n\n"
+                "مثال: `ID 123456789 5 d`", buttons=get_back_keyboard()
+            )
 
-    elif data == "stats":
-        await event.answer()
-        await event.edit(f"📊 **إحصائيات النظام:**\n- معرفك: `{user_id}`\n- الحالة: نشط ✅", buttons=get_back_keyboard())
+        elif data == "list_subs":
+            if user_id != ADMIN_ID: return
+            subs = get_subscribers()
+            if subs:
+                text = "👥 **قائمة المشتركين الحاليين:**\n\n"
+                for sub in subs:
+                    text += f"👤 ID: `{sub[0]}` | ⏳ ينتهي في: `{sub[1]}`\n"
+            else:
+                text = "👥 **قائمة المشتركين:**\nلا توجد اشتراكات مسجلة حالياً."
+            await event.answer()
+            await event.edit(text, buttons=get_back_keyboard())
 
-    elif data == "msg_user" or data == "msg_all":
-        await event.answer("قيد التطوير في التحديث القادم", alert=True)
+        elif data == "stats":
+            await event.answer()
+            await event.edit(f"📊 **إحصائيات النظام:**\n- معرفك: `{user_id}`\n- الحالة: نشط ✅", buttons=get_back_keyboard())
 
-    elif data == "my_numbers":
-        await event.answer()
-        numbers = get_user_numbers(user_id)
-        if numbers:
-            numbers_list = "\n".join([f"📱 `{num}`" for num in numbers])
-            text = f"📱 **أرقامك المسجلة خصيصاً لك:**\n\n{numbers_list}"
-        else:
-            text = "📱 **أرقامك المسجلة:**\nلا توجد أرقام مسجلة حالياً. استخدم زر 'إضافة رقم' أو أرسل ملف جلسات."
-        await event.edit(text, buttons=get_back_keyboard())
-    
-    elif data == "add_number":
-        await event.answer()
-        user_states[user_id] = {"action": "waiting_for_phone"}
-        await event.edit(
-            "➕ **إضافة رقم جديد:**\n"
-            "الرجاء إرسال رقم الهاتف الآن بالصيغة الدولية (مثال: `+96170123456`)", 
-            buttons=get_back_keyboard()
-        )
+        elif data == "my_numbers":
+            await event.answer()
+            numbers = get_user_numbers(user_id)
+            if numbers:
+                numbers_list = "\n".join([f"📱 `{num}`" for num in numbers])
+                text = f"📱 **أرقامك المسجلة خصيصاً لك:**\n\n{numbers_list}"
+            else:
+                text = "📱 **أرقامك المسجلة:**\nلا توجد أرقام مسجلة حالياً."
+            await event.edit(text, buttons=get_back_keyboard())
         
-    elif data == "delete_number":
-        await event.answer()
-        user_states[user_id] = {"action": "waiting_for_delete"}
-        await event.edit("➖ **حذف رقم:**\nأرسل الرقم الذي تريد حذفه من قائمتك الخاصة.", buttons=get_back_keyboard())
+        elif data == "add_number":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_phone"}
+            await event.edit("➕ **إضافة رقم جديد:**\nالرجاء إرسال رقم الهاتف بالصيغة الدولية (مثال: `+96170123456`)", buttons=get_back_keyboard())
+            
+        elif data == "delete_number":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_delete"}
+            await event.edit("➖ **حذف رقم:**\nأرسل الرقم الذي تريد حذفه.", buttons=get_back_keyboard())
 
-    elif data == "session_login":
-        await event.answer()
-        await event.edit("📥 **تسجيل دخول عبر ملف جلسات:**\nأرسل أي ملف بصيغة `zip` أو `sessions` أو `txt` وسأقوم بمعالجته واستخراج كافة الحسابات وإضافتها لقائمتك.", buttons=get_back_keyboard())
-        
-    elif data == "ref_bot":
-        await event.answer()
-        user_states[user_id] = {"action": "waiting_for_ref"}
-        await event.edit("🤖 **تشغيل بوت عبر إحالة / Mini App:**\nأرسل رابط الإحالة أو رابط البوت الآن لتوجيه الحسابات.", buttons=get_back_keyboard())
+        elif data == "session_login":
+            await event.answer()
+            await event.edit("📥 **تسجيل دخول عبر ملف جلسات:**\nأرسل ملف `zip` أو `sessions` أو `txt` وسأقوم بمعالجته.", buttons=get_back_keyboard())
+            
+        elif data == "export_sessions":
+            await event.answer()
+            nums = get_user_numbers(user_id)
+            if not nums:
+                return await event.edit("⚠️ لا توجد أرقام أو جلسات محفوظة لتصديرها.", buttons=get_back_keyboard())
+            
+            await event.edit("⏳ جاري تجميع ملفات الجلسات الخاصة بك...")
+            zip_filename = f"my_sessions_{user_id}.zip"
+            with zipfile.ZipFile(zip_filename, 'w') as zipf:
+                for phone in nums:
+                    s_name = f"session_{user_id}_{phone.replace('+', '')}.session"
+                    if os.path.exists(s_name):
+                        zipf.write(s_name)
+            
+            if os.path.exists(zip_filename):
+                await event.respond(file=zip_filename)
+                os.remove(zip_filename)
+                await event.edit("✅ **تم تصدير ملفات الجلسات بنجاح!**", buttons=get_back_keyboard())
+            else:
+                await event.edit("❌ لم يتم العثور على ملفات جلسات مادية مرتبطة بأرقامك.", buttons=get_back_keyboard())
 
-    elif data == "join_chat":
-        await event.answer()
-        user_states[user_id] = {"action": "waiting_for_join"}
-        await event.edit("📢 **انضمام لقناة أو مجموعة:**\nأرسل رابط القناة أو المجموعة (عام أو خاص).", buttons=get_back_keyboard())
-        
-    elif data == "leave_chat":
-        await event.answer()
-        user_states[user_id] = {"action": "waiting_for_leave"}
-        await event.edit("🚪 **مغادرة قناة أو مجموعة:**\nأرسل رابط القناة أو المجموعة للمغادرة.", buttons=get_back_keyboard())
-        
-    elif data == "join_folder":
-        await event.answer()
-        user_states[user_id] = {"action": "waiting_for_folder"}
-        await event.edit("📁 **انضمام لمجلد قنوات:**\nأرسل رابط المجلد وسأقوم بإجبار الحسابات على الانضمام للمجلد ولكافة محتوياته.", buttons=get_back_keyboard())
+        elif data == "ref_bot":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_ref"}
+            await event.edit("🤖 **تشغيل بوت عبر إحالة / Mini App:**\nأرسل رابط الإحالة أو البوت الآن.", buttons=get_back_keyboard())
 
-    elif data == "back_home":
-        await event.answer()
-        user_states.pop(user_id, None)
-        is_admin = (user_id == ADMIN_ID)
-        welcome_text = f"👑 **مرحباً بك من جديد يا زاك**\n\nاختر العملية المطلوبة:"
-        await event.edit(welcome_text, buttons=get_main_keyboard(is_admin))
-        
-    else:
-        await event.answer("عذراً، هذا الزر قيد التطوير", alert=True)
+        elif data == "join_chat":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_join"}
+            await event.edit("📢 **انضمام لقناة أو مجموعة:**\nأرسل الرابط الآن.", buttons=get_back_keyboard())
+            
+        elif data == "leave_chat":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_leave"}
+            await event.edit("🚪 **مغادرة قناة أو مجموعة:**\nأرسل الرابط للمغادرة.", buttons=get_back_keyboard())
+            
+        elif data == "join_folder":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_folder"}
+            await event.edit("📁 **انضمام لمجلد قنوات:**\nأرسل رابط المجلد الآن.", buttons=get_back_keyboard())
 
-# --- معالجة الملفات المرسلة (ZIP, sessions, txt) ---
+        elif data == "send_reaction":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_reaction"}
+            await event.edit("❤️ **تفاعل رياكشن:**\nأرسل رابط المنشور في القناة أو المجموعة متبوعاً بالإيموجي (مثال:\n`https://t.me/channel/123 👍`)\nأو أرسل الرابط وسنستخدم تفاعل 👍 افتراضياً.", buttons=get_back_keyboard())
+
+        elif data == "back_home":
+            await event.answer()
+            user_states.pop(user_id, None)
+            is_admin = (user_id == ADMIN_ID)
+            await event.edit("👑 **مرحباً بك من جديد يا زاك**\n\nاختر العملية المطلوبة:", buttons=get_main_keyboard(is_admin))
+            
+    except Exception as e:
+        logger.error(f"Error in callback handler: {e}")
+
+# --- معالجة الملفات المرسلة ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
-    user_id = event.sender_id
-    if user_id != ADMIN_ID and not is_subscribed(user_id):
-        await event.respond("⚠️ عذراً، أنت غير مشترك في البوت. قم بالتواصل مع @n1zack لتفعيل اشتراكك.")
-        return
-
-    path = await event.download_media()
-    filename = event.file.name or ""
-    await event.respond("📂 جاري فحص الملف ومعالجة الجلسات بدقة...")
-    
-    success_numbers = []
-    failed_reasons = []
-
     try:
+        user_id = event.sender_id
+        if user_id != ADMIN_ID and not is_subscribed(user_id):
+            return await event.respond("⚠️ عذراً، أنت غير مشترك في البوت.")
+
+        path = await event.download_media()
+        filename = event.file.name or ""
+        await event.respond("📂 جاري فحص الملف ومعالجة الجلسات...")
+        
+        success_numbers = []
+        
         if filename.endswith('.zip') or path.endswith('.zip'):
             extract_dir = f"sessions_{user_id}"
             os.makedirs(extract_dir, exist_ok=True)
@@ -191,52 +212,35 @@ async def handle_session_file(event):
                     for file in files:
                         if file.endswith('.session') or file.endswith('.txt'):
                             file_path = os.path.join(root, file)
-                            session_name_prefix = os.path.join(extract_dir, file.replace('.session', '').replace('.txt', ''))
+                            base_n = file.replace('.session', '').replace('.txt', '')
+                            sess_name = f"session_{user_id}_{base_n}"
                             try:
-                                sess_client = TelegramClient(session_name_prefix, API_ID, API_HASH)
+                                # نقل وتوحيد التسمية
+                                if file_path != f"{sess_name}.session":
+                                    import shutil
+                                    shutil.copy(file_path, f"{sess_name}.session")
+                                
+                                sess_client = TelegramClient(sess_name, API_ID, API_HASH)
                                 await sess_client.connect()
                                 if await sess_client.is_user_authorized():
                                     me = await sess_client.get_me()
                                     if me and me.phone:
-                                        phone_str = "+" + str(me.phone)
-                                        add_user_number(user_id, phone_str)
-                                        success_numbers.append(phone_str)
+                                        p_str = "+" + str(me.phone)
+                                        add_user_number(user_id, p_str)
+                                        success_numbers.append(p_str)
                                 await sess_client.disconnect()
-                            except Exception as e:
-                                failed_reasons.append(f"{file}: {str(e)}")
-        
-        elif filename.endswith('.session') or filename.endswith('.txt') or path.endswith('.session') or path.endswith('.txt'):
-            try:
-                base_name = path.replace('.session', '').replace('.txt', '')
-                sess_client = TelegramClient(base_name, API_ID, API_HASH)
-                await sess_client.connect()
-                if await sess_client.is_user_authorized():
-                    me = await sess_client.get_me()
-                    if me and me.phone:
-                        phone_str = "+" + str(me.phone)
-                        add_user_number(user_id, phone_str)
-                        success_numbers.append(phone_str)
-                await sess_client.disconnect()
-            except Exception as e:
-                failed_reasons.append(f"الملف الفردي: {str(e)}")
+                            except: pass
 
-        report = "📊 **تقرير معالجة ملفات الجلسات:**\n\n"
         if success_numbers:
-            report += f"✅ **تمت الإضافة بنجاح للأرقام التالية:**\n" + "\n".join([f"- `{n}`" for n in success_numbers]) + "\n\n"
+            await event.respond(f"✅ تمت إضافة الحسابات بنجاح:\n" + "\n".join([f"- `{n}`" for n in success_numbers]))
         else:
-            report += "⚠️ لم يتم العثور على أرقام نشطة صالحة للإضافة أو فشلت الجلسة.\n\n"
-            
-        if failed_reasons:
-            report += f"❌ **أسباب الفشل لبعض الملفات:**\n" + "\n".join([f"- `{r}`" for r in failed_reasons])
+            await event.respond("⚠️ لم يتم التعرف على حسابات صالحة داخل الملف المرفق.")
 
-        await event.respond(report)
-    except Exception as ex:
-        await event.respond(f"❌ حدث خطأ أثناء قراءة الملف: `{str(ex)}`")
+        if os.path.exists(path): os.remove(path)
+    except Exception as e:
+        logger.error(f"Error handling file: {e}")
 
-    if os.path.exists(path):
-        os.remove(path)
-
-# --- معالجة المدخلات النصية وحالات التفاعل ---
+# --- معالجة الرسائل النصية وحالات التفاعل ---
 @client.on(events.NewMessage(incoming=True))
 async def handle_user_messages(event):
     if not event.is_private or event.raw_text.startswith('/'):
@@ -250,147 +254,102 @@ async def handle_user_messages(event):
 
     action = user_states[user_id].get("action")
 
-    # 1. تفعيل الاشتراك عبر الآيدي (للمشرف فقط)
-    if action == "waiting_for_sub" and user_id == ADMIN_ID:
-        try:
+    try:
+        if action == "waiting_for_sub" and user_id == ADMIN_ID:
             parts = text.split()
             if parts[0].upper() == "ID" and parts[-1].lower() == "d":
                 target_user_id = int(parts[1])
                 days = int(parts[2])
                 expiry = add_subscriber(target_user_id, days)
-                
-                try:
-                    await client.send_message(
-                        target_user_id, 
-                        f"🎉 **تم تفعيل اشتراكك بنجاح!**\n⏳ المدة المضافة: `{days}` أيام\n📅 تاريخ الانتهاء: `{expiry}`"
-                    )
-                except:
-                    pass
-                
-                await event.respond(f"✅ تم تفعيل الاشتراك للمستخدم `{target_user_id}` لمدة `{days}` أيام بنجاح!")
-            else:
-                await event.respond("❌ الصيغة خاطئة. استخدم الصيغة: `ID 123456 5 d`")
-        except Exception as e:
-            await event.respond(f"❌ حدث خطأ في الصياغة: `{str(e)}`")
-        user_states.pop(user_id, None)
+                await event.respond(f"✅ تم تفعيل الاشتراك للمستخدم `{target_user_id}` لمدة `{days}` أيام حتى `{expiry}`.")
+            user_states.pop(user_id, None)
 
-    # 2. إضافة رقم يدوياً
-    elif action == "waiting_for_phone":
-        phone_number = text
-        user_states[user_id]["phone"] = phone_number
-        user_states[user_id]["action"] = "waiting_for_code"
-        await event.respond(f"⏳ جاري إرسال كود التحقق (OTP) إلى الرقم `{phone_number}`...")
-        try:
-            session_name = f"session_{user_id}_{phone_number.replace('+', '')}"
+        elif action == "waiting_for_phone":
+            user_states[user_id]["phone"] = text
+            user_states[user_id]["action"] = "waiting_for_code"
+            session_name = f"session_{user_id}_{text.replace('+', '')}"
             temp_client = TelegramClient(session_name, API_ID, API_HASH)
             await temp_client.connect()
-            sent = await temp_client.send_code_request(phone_number)
+            sent = await temp_client.send_code_request(text)
             user_states[user_id]["temp_client"] = temp_client
             user_states[user_id]["phone_code_hash"] = sent.phone_code_hash
-            await event.respond("✅ **تم إرسال كود التحقق!**\nيرجى إرسال الكود الآن (مثال: `12345`).")
-        except Exception as e:
-            await event.respond(f"❌ خطأ: `{str(e)}`\nتأكد من صحة الرقم وأعد المحاولة.")
+            await event.respond("✅ تم إرسال كود التحقق (OTP). أرسله الآن:")
+
+        elif action == "waiting_for_code":
+            state = user_states[user_id]
+            await state["temp_client"].sign_in(phone=state["phone"], code=text, phone_code_hash=state["phone_code_hash"])
+            add_user_number(user_id, state["phone"])
+            await state["temp_client"].disconnect()
+            await event.respond("🎉 تم تسجيل الدخول وحفظ الرقم بنجاح!")
             user_states.pop(user_id, None)
 
-    elif action == "waiting_for_code":
-        code = text
-        state = user_states[user_id]
-        temp_client = state["temp_client"]
-        phone = state["phone"]
-        phone_code_hash = state["phone_code_hash"]
-        try:
-            await temp_client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
-            add_user_number(user_id, phone)
-            await temp_client.disconnect()
-            await event.respond("🎉 **تم تسجيل الدخول وحفظ الرقم في قائمتك الخاصة بنجاح! ✅**")
+        elif action == "waiting_for_password":
+            state = user_states[user_id]
+            await state["temp_client"].sign_in(password=text)
+            add_user_number(user_id, state["phone"])
+            await state["temp_client"].disconnect()
+            await event.respond("🎉 تم تخطي التحقق بخطوتين وحفظ الحساب بنجاح!")
             user_states.pop(user_id, None)
-        except SessionPasswordNeededError:
-            user_states[user_id]["action"] = "waiting_for_password"
-            await event.respond("🔒 **الحساب محمي بكلمة مرور (التحقق بخطوتين - 2FA).**\nيرجى إرسال كلمة المرور الآن:")
-        except Exception as e:
-            await event.respond(f"❌ الكود غير صحيح: `{str(e)}`")
 
-    elif action == "waiting_for_password":
-        password = text
-        state = user_states[user_id]
-        temp_client = state["temp_client"]
-        phone = state["phone"]
-        try:
-            await temp_client.sign_in(password=password)
-            add_user_number(user_id, phone)
-            await temp_client.disconnect()
-            await event.respond("🎉 **تم تخطي التحقق بخطوتين وحفظ الحساب بنجاح تام! 🔒**")
+        elif action == "waiting_for_delete":
+            delete_user_number(user_id, text)
+            await event.respond(f"🗑️ تمت محاولة حذف الرقم `{text}`.")
             user_states.pop(user_id, None)
-        except Exception as e:
-            await event.respond(f"❌ كلمة المرور غير صحيحة: `{str(e)}`")
 
-    # 3. حذف رقم
-    elif action == "waiting_for_delete":
-        phone_to_delete = text
-        delete_user_number(user_id, phone_to_delete)
-        await event.respond(f"🗑️ تمت محاولة حذف الرقم `{phone_to_delete}` من قائمتك.")
-        user_states.pop(user_id, None)
+        elif action in ["waiting_for_ref", "waiting_for_join", "waiting_for_leave", "waiting_for_folder", "waiting_for_reaction"]:
+            link = text.split()[0] # استخراج الرابط إن وجد مع نص إضافي كالإيموجي
+            emoji = text.split()[1] if len(text.split()) > 1 else "👍"
+            
+            nums = get_user_numbers(user_id)
+            if not nums:
+                await event.respond("⚠️ لا توجد أرقام مسجلة لديك لتنفيذ العملية.")
+                user_states.pop(user_id, None)
+                return
 
-    # 4. معالجة روابط العمليات الفعليّة (إنضمام، مغادرة، مجلدات، إحالة)
-    elif action in ["waiting_for_ref", "waiting_for_join", "waiting_for_leave", "waiting_for_folder"]:
-        link = text
-        user_numbers_list = get_user_numbers(user_id)
-        
-        if not user_numbers_list:
-            await event.respond("⚠️ لا توجد لديك أي أرقام/حسابات مسجلة لتنفيذ هذه العملية. قم بإضافة أرقامك أو ملفات جلساتك أولاً.")
+            await event.respond(f"⏳ جاري التنفيذ على `{len(nums)}` حساب...")
+            success, fail = 0, 0
+
+            for phone in nums:
+                try:
+                    s_name = f"session_{user_id}_{phone.replace('+', '')}"
+                    if not os.path.exists(s_name + ".session"):
+                        s_name = phone.replace('+', '')
+                    
+                    async with TelegramClient(s_name, API_ID, API_HASH) as acc:
+                        if action == "waiting_for_join":
+                            if "+" in link or "joinchat" in link:
+                                await acc(ImportChatInviteRequest(link.split("/")[-1].replace("+", "")))
+                            else:
+                                await acc(JoinChannelRequest(link.split("/")[-1].replace("@", "")))
+                        elif action == "waiting_for_leave":
+                            await acc(LeaveChannelRequest(link.split("/")[-1].replace("@", "")))
+                        elif action == "waiting_for_ref":
+                            parts = link.split("/")
+                            bot_u = parts[-1].split("?")[0].replace("@", "")
+                            param = link.split("start=")[1].split("&")[0] if "start=" in link else ""
+                            await acc(StartBotRequest(bot=bot_u, peer=bot_u, start_param=param))
+                        elif action == "waiting_for_folder":
+                            if "addlist" in link:
+                                slug = link.split("addlist/")[-1]
+                                invite = await acc(CheckChatlistInviteRequest(slug=slug))
+                                await acc(JoinChatlistInviteRequest(slug=slug, peers=invite.peers))
+                        elif action == "waiting_for_reaction":
+                            # تحليل رابط المنشور (مثال t.me/channel/123)
+                            parts = link.split("/")
+                            channel_username = parts[-2]
+                            msg_id = int(parts[-1])
+                            entity = await acc.get_entity(channel_username)
+                            await acc(SendReactionRequest(peer=entity, msg_id=msg_id, reaction=[ReactionEmoji(emoticon=emoji)]))
+
+                        success += 1
+                except Exception as ex:
+                    fail += 1
+
+            await event.respond(f"📊 **النتيجة:**\n✅ نجحت: `{success}`\n❌ فشلت: `{fail}`")
             user_states.pop(user_id, None)
-            return
-
-        await event.respond(f"⏳ جاري تنفيذ العملية على عدد `{len(user_numbers_list)}` من حساباتك المسجلة...")
-        
-        success_count = 0
-        fail_count = 0
-
-        for phone in user_numbers_list:
-            try:
-                # البحث عن الجلسة الخاصة بالحساب
-                session_name = f"session_{user_id}_{phone.replace('+', '')}"
-                if not os.path.exists(session_name + ".session"):
-                    # البحث في مجلد المستخلصات أو الجلسات العامة
-                    session_name = phone.replace('+', '')
-                
-                async with TelegramClient(session_name, API_ID, API_HASH) as acc:
-                    if action == "waiting_for_join":
-                        if "+" in link or "joinchat" in link:
-                            invite_hash = link.split("/")[-1].replace("+", "")
-                            await acc(ImportChatInviteRequest(invite_hash))
-                        else:
-                            channel_username = link.split("/")[-1].replace("@", "")
-                            await acc(JoinChannelRequest(channel_username))
-                            
-                    elif action == "waiting_for_leave":
-                        channel_username = link.split("/")[-1].replace("@", "")
-                        await acc(LeaveChannelRequest(channel_username))
-
-                    elif action == "waiting_for_ref":
-                        parts = link.split("/")
-                        bot_username = parts[-1].split("?")[0].replace("@", "")
-                        param = ""
-                        if "start=" in link:
-                            param = link.split("start=")[1].split("&")[0]
-                        await acc(StartBotRequest(bot=bot_username, peer=bot_username, start_param=param))
-
-                    elif action == "waiting_for_folder":
-                        if "addlist" in link:
-                            slug = link.split("addlist/")[-1]
-                            invite = await acc(CheckChatlistInviteRequest(slug=slug))
-                            await acc(JoinChatlistInviteRequest(slug=slug, peers=invite.peers))
-
-                    success_count += 1
-            except Exception as ex:
-                fail_count += 1
-
-        await event.respond(
-            f"📊 **نتيجة تنفيذ العملية:**\n\n"
-            f"✅ نجحت مع `{success_count}` حساب.\n"
-            f"❌ فشلت مع `{fail_count}` حساب.\n"
-            f"الرابط المعالج: `{link}`"
-        )
+    except Exception as err:
+        logger.error(f"Error in message handler: {err}")
+        await event.respond(f"❌ حدث خطأ أثناء التنفيذ: `{str(err)}`")
         user_states.pop(user_id, None)
 
 async def main():
@@ -401,3 +360,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+ 

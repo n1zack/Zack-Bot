@@ -4,6 +4,7 @@ import zipfile
 import asyncio
 from aiohttp import web
 from telethon import TelegramClient, events
+from telethon.tl.types import ReplyKeyboardRemove
 from telethon.errors import SessionPasswordNeededError
 from database import init_db, add_user_number, get_user_numbers
 from keyboards import get_main_keyboard, get_admin_panel_keyboard, get_back_keyboard
@@ -69,7 +70,7 @@ async def handle_session_file(event):
     if os.path.exists(path):
         os.remove(path)
 
-# --- أمر /start الرئيسي ---
+# --- أمر /start الرئيسي (مع مسح الأزرار الثابتة نهائياً) ---
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
     user_id = event.sender_id
@@ -79,7 +80,8 @@ async def start(event):
         f"معرفك (ID): `{user_id}`\n\n"
         "اختر العملية المطلوبة لإدارة الحسابات والجلسات والأرقام:"
     )
-    await event.respond(welcome_text, buttons=get_main_keyboard())
+    # استخدام ReplyKeyboardRemove() لحذف أي أزرار ثابتة قديمة من الشاشة
+    await event.respond(welcome_text, buttons=[ReplyKeyboardRemove(), get_main_keyboard()])
 
 # --- معالج الأزرار الشفافة (Callbacks) ---
 @client.on(events.CallbackQuery)
@@ -144,7 +146,7 @@ async def callback_handler(event):
         await event.edit("📂 **أرسل رابط مجلد القنوات:**", buttons=get_back_keyboard())
 
     elif data == "stats":
-        await event.answer("جلب الإحصائيات...", alert=False)
+        await event.answer()
         await event.edit(f"📊 **إحصائيات حسابك:**\n- ID: `{user_id}`\n- الحالة: Super Admin / مفعل ✅", buttons=get_back_keyboard())
         
     elif data == "activate_sub":
@@ -236,7 +238,7 @@ async def handle_user_messages(event):
             try:
                 await temp_client.sign_in(password=password)
                 
-                # حفظ الرقم في قاعدة البيانات أيضاً عند تخطي التحقق بخطوتين
+                # حفظ الرقم في قاعدة البيانات عند تخطي التحقق بخطوتين
                 add_user_number(user_id, phone)
                 
                 await event.respond("🎉 **تم تسجيل الدخول بنجاح تام وتفعيل الحساب وحفظه! 🔒**")
@@ -247,7 +249,7 @@ async def handle_user_messages(event):
 async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
-    logging.info("Zack-Bot started successfully with database saving enabled.")
+    logging.info("Zack-Bot started successfully with database and fixed keyboards.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

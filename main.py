@@ -3,8 +3,7 @@ import logging
 import zipfile
 import asyncio
 from aiohttp import web
-from telethon import TelegramClient, events
-from telethon.tl.types import ReplyKeyboardRemove
+from telethon import TelegramClient, events, Button
 from telethon.errors import SessionPasswordNeededError
 from database import init_db, add_user_number, get_user_numbers
 from keyboards import get_main_keyboard, get_admin_panel_keyboard, get_back_keyboard
@@ -70,7 +69,7 @@ async def handle_session_file(event):
     if os.path.exists(path):
         os.remove(path)
 
-# --- أمر /start الرئيسي (مع مسح الأزرار الثابتة نهائياً) ---
+# --- أمر /start الرئيسي (مع إزالة الأزرار الثابتة بالطريقة الصحيحة) ---
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
     user_id = event.sender_id
@@ -80,8 +79,8 @@ async def start(event):
         f"معرفك (ID): `{user_id}`\n\n"
         "اختر العملية المطلوبة لإدارة الحسابات والجلسات والأرقام:"
     )
-    # استخدام ReplyKeyboardRemove() لحذف أي أزرار ثابتة قديمة من الشاشة
-    await event.respond(welcome_text, buttons=[ReplyKeyboardRemove(), get_main_keyboard()])
+    # إزالة الأزرار الثابتة باستخدام Button.clear() مع لوحة الأزرار الشفافة
+    await event.respond(welcome_text, buttons=[Button.clear(), get_main_keyboard()])
 
 # --- معالج الأزرار الشفافة (Callbacks) ---
 @client.on(events.CallbackQuery)
@@ -249,7 +248,7 @@ async def handle_user_messages(event):
 async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
-    logging.info("Zack-Bot started successfully with database and fixed keyboards.")
+    logging.info("Zack-Bot started successfully.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

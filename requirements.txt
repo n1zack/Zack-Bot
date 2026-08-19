@@ -1,3 +1,5 @@
 tgcrypto
 aiohttp
-hydrogram
+pyrogram==2.0.106
+pyaes
+pysocks

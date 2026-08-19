@@ -66,7 +66,7 @@ async def keep_alive():
         
         await asyncio.sleep(300)
 
-# اسم جلسة جديد ونظيف لمنع التعارض
+# اسم الجلسة
 client = TelegramClient('zack_bot_super_admin', API_ID, API_HASH)
 
 # --- أمر /start ---
@@ -80,6 +80,16 @@ async def start(event):
         sender = await event.get_sender()
         user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
         
+        # التحقق من الاشتراك إذا لم يكن مشرفاً
+        if not is_admin and not is_subscribed(user_id):
+            await event.respond(
+                f"⚠️ **أنت غير مشترك في البوت.**\n"
+                f"معرفك (ID): `{user_id}`\n"
+                "قم بالتواصل مع @n1zack لتفعيل اشتراكك.",
+                buttons=get_back_keyboard()
+            )
+            return
+
         if is_admin:
             welcome_text = (
                 f"👑 **مرحباً بك مجدداً يا زاك (المشرف العام)**\n"
@@ -106,7 +116,12 @@ async def callback_handler(event):
         
         if data not in ["back_home", "admin_panel"] and user_id != ADMIN_ID and not is_subscribed(user_id):
             await event.answer("⚠️ اشتراكك منتهٍ أو غير مفعل!", alert=True)
-            await event.edit("⚠️ عذراً، أنت غير مشترك في البوت.\nقم بالتواصل مع المشرف لتفعيل اشتراكك.", buttons=get_back_keyboard())
+            await event.edit(
+                f"⚠️ **أنت غير مشترك في البوت.**\n"
+                f"معرفك (ID): `{user_id}`\n"
+                "قم بالتواصل مع @n1zack لتفعيل اشتراكك.",
+                buttons=get_back_keyboard()
+            )
             return
 
         if data == "admin_panel":
@@ -242,6 +257,15 @@ async def callback_handler(event):
             user_states.pop(user_id, None)
             is_admin = (user_id == ADMIN_ID)
             
+            if not is_admin and not is_subscribed(user_id):
+                await event.edit(
+                    f"⚠️ **أنت غير مشترك في البوت.**\n"
+                    f"معرفك (ID): `{user_id}`\n"
+                    "قم بالتواصل مع @n1zack لتفعيل اشتراكك.",
+                    buttons=get_back_keyboard()
+                )
+                return
+
             sender = await event.get_sender()
             user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
             
@@ -261,7 +285,11 @@ async def handle_session_file(event):
     try:
         user_id = event.sender_id
         if user_id != ADMIN_ID and not is_subscribed(user_id):
-            return await event.respond("⚠️ عذراً، أنت غير مشترك في البوت.")
+            return await event.respond(
+                f"⚠️ **أنت غير مشترك في البوت.**\n"
+                f"معرفك (ID): `{user_id}`\n"
+                "قم بالتواصل مع @n1zack لتفعيل اشتراكك."
+            )
 
         path = await event.download_media()
         filename = event.file.name or ""
@@ -311,6 +339,9 @@ async def handle_user_messages(event):
         
     user_id = event.sender_id
     text = event.raw_text.strip()
+    
+    if user_id != ADMIN_ID and not is_subscribed(user_id):
+        return
     
     if user_id not in user_states:
         return
@@ -466,7 +497,7 @@ async def main():
     asyncio.create_task(keep_alive())
     
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with new token.")
+    logger.info("Zack-Bot started successfully with custom subscription alert.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

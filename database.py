@@ -1,32 +1,32 @@
 import sqlite3
-import os
 
 def init_db():
-    conn = sqlite3.connect("bot_data.db")
+    conn = sqlite3.connect('bot_database.db')
     cursor = conn.cursor()
-    cursor.execute("CREATE TABLE IF NOT EXISTS phone_numbers (id INTEGER PRIMARY KEY, user_id INTEGER, phone TEXT)")
-    cursor.execute("CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY, user_id INTEGER, file_path TEXT)")
+    # إنشاء جدول حفظ أرقام المستخدمين
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_numbers (
+            user_id INTEGER,
+            phone TEXT
+        )
+    ''')
     conn.commit()
     conn.close()
 
-def add_phone(user_id, phone):
-    conn = sqlite3.connect("bot_data.db")
+def add_user_number(user_id, phone):
+    conn = sqlite3.connect('bot_database.db')
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO phone_numbers (user_id, phone) VALUES (?, ?)", (user_id, phone))
-    conn.commit()
+    # منع تكرار نفس الرقم لنفس المستخدم
+    cursor.execute("SELECT phone FROM user_numbers WHERE user_id = ? AND phone = ?", (user_id, phone))
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO user_numbers (user_id, phone) VALUES (?, ?)", (user_id, phone))
+        conn.commit()
     conn.close()
 
-def get_user_phones(user_id):
-    conn = sqlite3.connect("bot_data.db")
+def get_user_numbers(user_id):
+    conn = sqlite3.connect('bot_database.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT id, phone FROM phone_numbers WHERE user_id = ?", (user_id,))
-    data = cursor.fetchall()
+    cursor.execute("SELECT phone FROM user_numbers WHERE user_id = ?", (user_id,))
+    rows = cursor.fetchall()
     conn.close()
-    return data
-
-def delete_phone_by_id(phone_id, user_id):
-    conn = sqlite3.connect("bot_data.db")
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM phone_numbers WHERE id = ? AND user_id = ?", (phone_id, user_id))
-    conn.commit()
-    conn.close()
+    return [row[0] for row in rows]

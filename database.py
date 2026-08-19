@@ -4,11 +4,13 @@ import datetime
 def init_db():
     conn = sqlite3.connect('bot_database.db')
     cursor = conn.cursor()
-    # جدول الأرقام مع ربط كل رقم بمستخدمه حصرياً لمنع الاختلاط
+    # جدول الأرقام والجلسات مع عزل تام لكل مستخدم عبر user_id و phone
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_numbers (
             user_id INTEGER,
-            phone TEXT
+            phone TEXT,
+            session_string TEXT,
+            PRIMARY KEY (user_id, phone)
         )
     ''')
     # جدول المشتركين
@@ -21,13 +23,17 @@ def init_db():
     conn.commit()
     conn.close()
 
-def add_user_number(user_id, phone):
+def add_user_number(user_id, phone, session_string=""):
     conn = sqlite3.connect('bot_database.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT phone FROM user_numbers WHERE user_id = ? AND phone = ?", (user_id, phone))
-    if not cursor.fetchone():
-        cursor.execute("INSERT INTO user_numbers (user_id, phone) VALUES (?, ?)", (user_id, phone))
-        conn.commit()
+    # تحديث الجلسة إذا كانت موجودة أو إضافتها جديدة للمستخدم حصرياً
+    cursor.execute('''
+        INSERT INTO user_numbers (user_id, phone, session_string) 
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id, phone) 
+        DO UPDATE SET session_string = excluded.session_string
+    ''', (user_id, phone, session_string))
+    conn.commit()
     conn.close()
 
 def get_user_numbers(user_id):
@@ -37,6 +43,14 @@ def get_user_numbers(user_id):
     rows = cursor.fetchall()
     conn.close()
     return [row[0] for row in rows]
+
+def get_session_string(user_id, phone):
+    conn = sqlite3.connect('bot_database.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT session_string FROM user_numbers WHERE user_id = ? AND phone = ?", (user_id, phone))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else None
 
 def delete_user_number(user_id, phone):
     conn = sqlite3.connect('bot_database.db')

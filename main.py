@@ -2,7 +2,7 @@ import os
 import logging
 from aiohttp import web
 from telethon import TelegramClient, events
-from telethon.tl.types import ReplyKeyboardRemove
+from telethon.types import ReplyKeyboardRemove
 from database import init_db
 from keyboards import get_main_keyboard, get_back_keyboard
 
@@ -31,14 +31,14 @@ async def start_web_server():
 
 client = TelegramClient('zack_bot', API_ID, API_HASH)
 
-# أمر /start الرئيسي (مع إزالة أي أزرار رد ثابتة قديمة)
+# أمر /start الرئيسي (مع إزالة الأزرار الثابتة القديمة)
 @client.on(events.NewMessage(pattern='/start'))
 async def start(event):
     welcome_text = (
         "👑 **مرحباً بك يا زاك في لوحة تحكم Super Admin**\n\n"
         "إليك لوحة التحكم الشاملة لإدارة الحسابات والجلسات والأزرار:"
     )
-    # نرسل الأزرار الشفافة وفوقها أمر حذف الأزرار الثابتة القديمة
+    # إرسال رسالة مع حذف الأزرار القديمة وتفعيل الأزرار الشفافة
     await event.respond(
         welcome_text, 
         buttons=[get_main_keyboard(), ReplyKeyboardRemove()]
@@ -52,7 +52,7 @@ async def callback_handler(event):
     if data == "admin_panel":
         await event.answer("تم فتح لوحة التحكم", alert=False)
         await event.edit(
-            "⚙️ **لوحة التحكم الرئيسية:**\nاختر القسم المطلوبة لإدارة الأرقام:",
+            "⚙️ **لوحة التحكم الرئيسية:**\nاختر القسم المطلوب لإدارة الأرقام:",
             buttons=[
                 [Button.inline("➕ إضافة رقم", b"add_number"), Button.inline("➖ حذف رقم", b"delete_number")],
                 [Button.inline("🔙 رجوع للقائمة الرئيسية", b"back_home")]
@@ -134,7 +134,7 @@ async def callback_handler(event):
 async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
-    logging.info("Telegram Bot started successfully with clean layout.")
+    logging.info("Telegram Bot started successfully.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

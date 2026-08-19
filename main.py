@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 init_db()
 
 # ================= بياناتك الثابتة المعتمدة =================
-BOT_TOKEN = '8545427199:AAG5hZC0DypVhE8xFuwOOEWrqwuirh_hutc'
+BOT_TOKEN = '8545427199:AAFr8eFKX6LUrGQCz9oRH14ASvzPYXLPJbs'
 API_ID = 31470691  
 API_HASH = '5c3f24ee62d7a7e46601a53f571f62cc'
 ADMIN_ID = 1251313339

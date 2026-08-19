@@ -16,7 +16,7 @@ def init_db():
 def add_user_number(user_id, phone):
     conn = sqlite3.connect('bot_database.db')
     cursor = conn.cursor()
-    # منع تكرار نفس الرقم لنفس المستخدم
+    # التأكد من عدم إضافة رقم مكرر لنفس المستخدم
     cursor.execute("SELECT phone FROM user_numbers WHERE user_id = ? AND phone = ?", (user_id, phone))
     if not cursor.fetchone():
         cursor.execute("INSERT INTO user_numbers (user_id, phone) VALUES (?, ?)", (user_id, phone))

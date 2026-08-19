@@ -26,7 +26,6 @@ def init_db():
 def add_user_number(user_id, phone, session_string=""):
     conn = sqlite3.connect('bot_database.db')
     cursor = conn.cursor()
-    # تحديث الجلسة إذا كانت موجودة أو إضافتها جديدة للمستخدم حصرياً
     cursor.execute('''
         INSERT INTO user_numbers (user_id, phone, session_string) 
         VALUES (?, ?, ?)

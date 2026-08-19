@@ -1,3 +1,23 @@
+from aiohttp import web
+
+# أضف هذا الجزء في نهاية ملف main.py قبل التشغيل
+async def handle(request):
+    return web.Response(text="Bot is running!")
+
+app_web = web.Application()
+app_web.add_routes([web.get('/', handle)])
+
+# في نهاية الملف عند التشغيل
+if __name__ == "__main__":
+    # هذا يضمن تشغيل سيرفر الويب بجانب البوت
+    import asyncio
+    runner = web.AppRunner(app_web)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(runner.setup())
+    site = web.TCPSite(runner, '0.0.0.0', 10000)
+    loop.run_until_complete(site.start())
+    app.run()
+
 import logging
 from pyrogram import Client, filters
 import config

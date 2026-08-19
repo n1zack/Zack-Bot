@@ -3,6 +3,7 @@ import logging
 import zipfile
 import asyncio
 import datetime
+import sqlite3
 from aiohttp import web
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession
@@ -114,6 +115,25 @@ async def callback_handler(event):
             await event.answer()
             await event.edit(f"📊 **إحصائيات النظام:**\n- معرفك: `{user_id}`\n- الحالة: نشط ✅", buttons=get_back_keyboard())
 
+        elif data == "msg_user":
+            if user_id != ADMIN_ID: return
+            user_states[user_id] = {"action": "waiting_for_msg_user"}
+            await event.answer()
+            await event.edit(
+                "✉️ **إرسال رسالة لمستخدم:**\n"
+                "أرسل الرسالة بالصيغة التالية:\n`[ID] [النص]`\n\n"
+                "مثال: `123456789 مرحباً بك`", buttons=get_back_keyboard()
+            )
+
+        elif data == "msg_all":
+            if user_id != ADMIN_ID: return
+            user_states[user_id] = {"action": "waiting_for_msg_all"}
+            await event.answer()
+            await event.edit(
+                "📢 **إرسال رسالة للجميع:**\n"
+                "أرسل النص الذي تريد إذاعته لكافة المستخدمين الآن:", buttons=get_back_keyboard()
+            )
+
         elif data == "my_numbers":
             await event.answer()
             numbers = get_user_numbers(user_id)
@@ -150,14 +170,10 @@ async def callback_handler(event):
                 for phone in nums:
                     s_str = get_session_string(user_id, phone)
                     if s_str:
-                        # كتابة الجلسة المؤقتة داخل ملف txt أو session داخل الـ zip
                         temp_filename = f"{phone.replace('+', '')}.session"
-                        # استخدام StringSession لتصديرها كملف فعلي مؤقت للتحميل
                         temp_client = TelegramClient(StringSession(s_str), API_ID, API_HASH)
-                        # حفظه مؤقتاً بالقرص للضغط
                         async with temp_client:
                             pass
-                        # ملاحظة: telethon ينشئ ملفاً محلياً باسم السشن المؤقت
                         if os.path.exists(temp_filename):
                             zipf.write(temp_filename)
                             os.remove(temp_filename)
@@ -203,7 +219,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة الملفات المرسلة وحفظها كـ StringSession في قاعدة البيانات ---
+# --- معالجة الملفات المرسلة وحفظها كـ StringSession ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -227,7 +243,6 @@ async def handle_session_file(event):
                         if file.endswith('.session') or file.endswith('.txt'):
                             file_path = os.path.join(root, file)
                             try:
-                                # قراءة ملف الجلسة القديم وتحويله لـ StringSession
                                 temp_client = TelegramClient(file_path, API_ID, API_HASH)
                                 await temp_client.connect()
                                 if await temp_client.is_user_authorized():
@@ -235,12 +250,10 @@ async def handle_session_file(event):
                                     if me and me.phone:
                                         p_str = "+" + str(me.phone)
                                         session_string = temp_client.session.save()
-                                        # تخزين حصري للمستخدم الحالي فقط
                                         add_user_number(user_id, p_str, session_string)
                                         success_numbers.append(p_str)
                                 await temp_client.disconnect()
                             except: pass
-            # تنظيف المجلد المؤقت
             import shutil
             if os.path.exists(extract_dir):
                 shutil.rmtree(extract_dir)
@@ -276,12 +289,53 @@ async def handle_user_messages(event):
                 days = int(parts[2])
                 expiry = add_subscriber(target_user_id, days)
                 await event.respond(f"✅ تم تفعيل الاشتراك للمستخدم `{target_user_id}` لمدة `{days}` أيام حتى `{expiry}`.")
+                
+                # إرسال إشعار للمستخدم بتفعيل اشتراكه
+                try:
+                    await client.send_message(
+                        target_user_id, 
+                        f"🎉 **مبروك! تم تفعيل اشتراكك في البوت بنجاح.**\n⏳ تاريخ الانتهاء: `{expiry}`\n\nيمكنك الآن استخدام كافة ميزات البوت بكامل الصلاحيات."
+                    )
+                except Exception as ex:
+                    logger.error(f"Could not notify user {target_user_id}: {ex}")
+            user_states.pop(user_id, None)
+
+        elif action == "waiting_for_msg_user" and user_id == ADMIN_ID:
+            try:
+                parts = text.split(maxsplit=1)
+                target_user_id = int(parts[0])
+                msg_text = parts[1]
+                await client.send_message(target_user_id, f"📬 **رسالة من الإدارة:**\n\n{msg_text}")
+                await event.respond(f"✅ تم إرسال الرسالة إلى المستخدم `{target_user_id}` بنجاح.")
+            except Exception as ex:
+                await event.respond(f"❌ فشل إرسال الرسالة (تأكد من الصيغة: ID النص): {ex}")
+            user_states.pop(user_id, None)
+
+        elif action == "waiting_for_msg_all" and user_id == ADMIN_ID:
+            conn = sqlite3.connect('bot_database.db')
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT user_id FROM user_numbers UNION SELECT DISTINCT user_id FROM subscribers")
+            all_users = [row[0] for row in cursor.fetchall()]
+            conn.close()
+
+            success_count = 0
+            await event.respond(f"⏳ جاري إرسال الإذاعة إلى `{len(all_users)}` مستخدم...")
+            
+            for uid in all_users:
+                if uid == ADMIN_ID: continue
+                try:
+                    await client.send_message(uid, f"📢 **إعلان عام من الإدارة:**\n\n{text}")
+                    success_count += 1
+                    await asyncio.sleep(0.2)
+                except:
+                    pass
+
+            await event.respond(f"✅ تم إرسال الإذاعة بنجاح إلى `{success_count}` مستخدم.")
             user_states.pop(user_id, None)
 
         elif action == "waiting_for_phone":
             user_states[user_id]["phone"] = text
             user_states[user_id]["action"] = "waiting_for_code"
-            # استخدام StringSession مؤقتة جديدة للربط اليدوي
             temp_client = TelegramClient(StringSession(), API_ID, API_HASH)
             await temp_client.connect()
             sent = await temp_client.send_code_request(text)
@@ -336,7 +390,6 @@ async def handle_user_messages(event):
                         fail += 1
                         continue
                     
-                    # تشغيل العميل باستخدام StringSession الخاص بالمستخدم وفقط به
                     async with TelegramClient(StringSession(s_str), API_ID, API_HASH) as acc:
                         if action == "waiting_for_join":
                             if "+" in link or "joinchat" in link:
@@ -376,9 +429,8 @@ async def handle_user_messages(event):
 async def main():
     await start_web_server()
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with database StringSessions.")
+    logger.info("Zack-Bot started successfully with full database & messaging features.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

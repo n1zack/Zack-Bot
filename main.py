@@ -54,7 +54,6 @@ async def start_web_server():
 # دالة إرسال Ping تلقائي للبوت كل 5 دقائق لمنع الخمول على Render
 async def keep_alive():
     await asyncio.sleep(15)
-    # استبدل الرابط أدناه برابط موقعك الفعلي على Render
     RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://your-app-name.onrender.com")
     
     while True:
@@ -65,7 +64,6 @@ async def keep_alive():
         except Exception as e:
             logger.error(f"Keep-Alive ping failed: {e}")
         
-        # الانتظار لمدة 5 دقائق (300 ثانية)
         await asyncio.sleep(300)
 
 # تهيئة عميل التيليجرام الأساسي للبوت
@@ -79,11 +77,23 @@ async def start(event):
         user_states.pop(user_id, None)
         is_admin = (user_id == ADMIN_ID)
         
-        welcome_text = (
-            f"👑 **مرحباً بك يا زاك في لوحة تحكم البوت الشاملة**\n"
-            f"معرفك (ID): `{user_id}`\n\n"
-            "اختر العملية المطلوبة لإدارة الحسابات والجلسات والأرقام:"
-        )
+        # جلب معلومات المستخدم الحقيقي لطباعة اسمه
+        sender = await event.get_sender()
+        user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
+        
+        if is_admin:
+            welcome_text = (
+                f"👑 **مرحباً بك مجدداً يا زاك (المشرف العام)**\n"
+                f"معرفك (ID): `{user_id}`\n\n"
+                "اختر العملية المطلوبة لإدارة الحسابات والجلسات والأرقام:"
+            )
+        else:
+            welcome_text = (
+                f"👋 **مرحباً بك {user_name} في البوت الشامل**\n"
+                f"معرفك (ID): `{user_id}`\n\n"
+                "اختر العملية المطلوبة:"
+            )
+            
         await event.respond(welcome_text, buttons=get_main_keyboard(is_admin))
     except Exception as e:
         logger.error(f"Error in start command: {e}")
@@ -97,7 +107,7 @@ async def callback_handler(event):
         
         if data not in ["back_home", "admin_panel"] and user_id != ADMIN_ID and not is_subscribed(user_id):
             await event.answer("⚠️ اشتراكك منتهٍ أو غير مفعل!", alert=True)
-            await event.edit("⚠️ عذراً، أنت غير مشترك في البوت.\nقم بالتواصل مع @n1zack لتفعيل اشتراكك.", buttons=get_back_keyboard())
+            await event.edit("⚠️ عذراً، أنت غير مشترك في البوت.\nقم بالتواصل مع المشرف لتفعيل اشتراكك.", buttons=get_back_keyboard())
             return
 
         if data == "admin_panel":
@@ -232,7 +242,16 @@ async def callback_handler(event):
             await event.answer()
             user_states.pop(user_id, None)
             is_admin = (user_id == ADMIN_ID)
-            await event.edit("👑 **مرحباً بك من جديد يا زاك**\n\nاختر العملية المطلوبة:", buttons=get_main_keyboard(is_admin))
+            
+            sender = await event.get_sender()
+            user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
+            
+            if is_admin:
+                welcome_text = f"👑 **مرحباً بك مجدداً يا زاك (المشرف العام)**\n\nاختر العملية المطلوبة:"
+            else:
+                welcome_text = f"👋 **مرحباً بك {user_name} من جديد**\n\nاختر العملية المطلوبة:"
+                
+            await event.edit(welcome_text, buttons=get_main_keyboard(is_admin))
             
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
@@ -445,11 +464,10 @@ async def handle_user_messages(event):
 
 async def main():
     await start_web_server()
-    # تشغيل مهمة البقاء نشطاً في الخلفية لمنع الخمول
     asyncio.create_task(keep_alive())
     
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with Keep-Alive task & full database.")
+    logger.info("Zack-Bot started successfully with personalized greeting.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

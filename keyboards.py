@@ -1,27 +1,36 @@
 from telethon import Button
 
 def get_main_keyboard():
-    # القائمة الرئيسية المختصرة (خاصة بالجلسات والأرقام فقط)
-    buttons = [
+    return [
+        # الصف الأول: لوحة التحكم
         [Button.inline("⚙️ لوحة التحكم والإدارة", b"admin_panel")],
+        
+        # الصف الثاني: عرض الأرقام
+        [Button.inline("📱 أرقامي (قائمة الأرقام)", b"my_numbers")],
+        
+        # الصف الثالث: إضافة وحذف الأرقام
         [Button.inline("➕ إضافة رقم", b"add_number"), Button.inline("➖ حذف رقم", b"delete_number")],
-        [Button.inline("📂 تسجيل عبر ملف جلسات", b"session_login"), Button.inline("📁 إنشاء ملف جلسات", b"create_session")],
-        [Button.inline("🔗 تشغيل عبر رابط إحالة", b"ref_link"), Button.inline("➕ انضمام لقناة/مجموعة", b"join_chat")],
-        [Button.inline("➖ مغادرة قناة/مجموعة", b"leave_chat"), Button.inline("📂 انضمام لمجلد قنوات", b"join_folder")],
-        [Button.inline("❤️ تفاعل رياكشن", b"send_reaction")]
+        
+        # الصف الرابع: تسجيل الجلسات
+        [Button.inline("📂 تسجيل جلسة (Zip/Txt/Session)", b"session_login")],
+        
+        # الصف الخامس: تشغيل الروابط وتفاعل الرياضكشن
+        [Button.inline("🔗 تشغيل بوت/Mini App", b"ref_link"), Button.inline("❤️ تفاعل رياكشن", b"send_reaction")],
+        
+        # الصف السادس: الانضمام والمغادرة والمجلدات
+        [Button.inline("➕ انضمام لقناة", b"join_chat"), Button.inline("➖ مغادرة قناة", b"leave_chat")],
+        [Button.inline("📁 انضمام لمجلد قنوات", b"join_folder")]
     ]
-    return buttons
 
 def get_admin_panel_keyboard():
-    # الأزرار داخل "لوحة التحكم"
-    buttons = [
-        [Button.inline("📊 الإحصائيات", b"stats"), Button.inline("💎 تفعيل اشتراك (ID)", b"activate_sub")],
+    # أزرار لوحة الإدارة
+    return [
+        [Button.inline("📊 الإحصائيات", b"stats"), Button.inline("💎 تفعيل اشتراك", b"activate_sub")],
         [Button.inline("👥 قائمة المشتركين", b"list_subs"), Button.inline("👤 إدارة المشرفين", b"manage_admins")],
         [Button.inline("📢 الإذاعة والتوجيه", b"broadcast")],
         [Button.inline("🔙 رجوع للقائمة الرئيسية", b"back_home")]
     ]
-    return buttons
 
 def get_back_keyboard():
-    # زر الرجوع الموحد للوحة التحكم
-    return [[Button.inline("🔙 رجوع للوحة التحكم", b"admin_panel")]]
+    # زر الرجوع الموحد
+    return [[Button.inline("🔙 رجوع للقائمة الرئيسية", b"back_home")]]

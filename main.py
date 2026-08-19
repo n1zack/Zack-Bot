@@ -66,8 +66,8 @@ async def keep_alive():
         
         await asyncio.sleep(300)
 
-# تهيئة عميل التيليجرام الأساسي للبوت
-client = TelegramClient('zack_bot_main', API_ID, API_HASH)
+# اسم جلسة جديد ونظيف لمنع التعارض
+client = TelegramClient('zack_bot_super_admin', API_ID, API_HASH)
 
 # --- أمر /start ---
 @client.on(events.NewMessage(pattern='/start'))
@@ -77,7 +77,6 @@ async def start(event):
         user_states.pop(user_id, None)
         is_admin = (user_id == ADMIN_ID)
         
-        # جلب معلومات المستخدم الحقيقي لطباعة اسمه
         sender = await event.get_sender()
         user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
         
@@ -467,7 +466,7 @@ async def main():
     asyncio.create_task(keep_alive())
     
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with personalized greeting.")
+    logger.info("Zack-Bot started successfully with new token.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

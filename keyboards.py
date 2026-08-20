@@ -6,7 +6,10 @@ def get_main_keyboard(is_admin=False):
         [Button.inline("📥 تسجيل دخول (جلسات متعددة)", "session_login"), Button.inline("📤 تصدير الجلسات (ZIP)", "export_sessions")],
         [Button.inline("🤖 تشغيل بوت (إحالة / Mini App)", "ref_bot"), Button.inline("❤️ تفاعل رياكشن", "send_reaction")],
         [Button.inline("📢 انضمام لقناة/مجموعة", "join_chat"), Button.inline("🚪 مغادرة قناة/مجموعة", "leave_chat")],
-        [Button.inline("📁 انضمام لمجلد", "join_folder")]
+        [Button.inline("📁 انضمام لمجلد", "join_folder")],
+        # الميزات الجديدة
+        [Button.inline("👀 زيادة مشاهدات", "view_post"), Button.inline("🔄 فحص الحسابات", "check_accounts")],
+        [Button.inline("💬 رسالة للمجموعة", "send_group_msg"), Button.inline("✍️ تعليق على منشور", "comment_post")]
     ]
     if is_admin:
         keyboard.insert(0, [Button.inline("⚙️ لوحة التحكم", "admin_panel")])

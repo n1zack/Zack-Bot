@@ -215,7 +215,6 @@ async def callback_handler(event):
                     if s_str:
                         clean_phone = phone.replace('+', '')
                         txt_filename = f"{clean_phone}.txt"
-                        # حفظ سلسلة الجلسة (StringSession) داخل ملف نصي لكي يقبله البوت عند إعادة رفعه
                         with open(txt_filename, "w", encoding="utf-8") as f:
                             f.write(s_str)
                         zipf.write(txt_filename)
@@ -224,7 +223,7 @@ async def callback_handler(event):
             if os.path.exists(zip_filename):
                 await event.respond(file=zip_filename)
                 os.remove(zip_filename)
-                await event.edit("✅ **تم تصدير ملفات الجلسات بنجاح!** (تم حفظها بصيغة نصية سليمة قابلة للاستيراد لاحقاً)", buttons=get_back_keyboard())
+                await event.edit("✅ **تم تصدير ملفات الجلسات بنجاح!**", buttons=get_back_keyboard())
             else:
                 await event.edit("❌ لم يتم العثور على بيانات جلسات مرتبطة بأرقامك.", buttons=get_back_keyboard())
 
@@ -313,7 +312,6 @@ async def handle_session_file(event):
                                     with open(file_path, "r", encoding="utf-8") as rf:
                                         session_string = rf.read().strip()
                                 else:
-                                    # قراءة ملفات الجلسة القديمة إن وجدت
                                     temp_client = TelegramClient(file_path, API_ID, API_HASH)
                                     await temp_client.connect()
                                     if await temp_client.is_user_authorized():
@@ -321,7 +319,6 @@ async def handle_session_file(event):
                                     await temp_client.disconnect()
 
                                 if session_string:
-                                    # التحقق من صلاحية StringSession واستخراج رقم الهاتف المرتبط بها
                                     verify_client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
                                     await verify_client.connect()
                                     if await verify_client.is_user_authorized():
@@ -484,10 +481,19 @@ async def handle_user_messages(event):
                         elif action == "waiting_for_leave":
                             await acc(LeaveChannelRequest(link.split("/")[-1].replace("@", "")))
                         elif action == "waiting_for_ref":
-                            parts = link.split("/")
-                            bot_u = parts[-1].split("?")[0].replace("@", "")
-                            param = link.split("start=")[1].split("&")[0] if "start=" in link else ""
-                            await acc(StartBotRequest(bot=bot_u, peer=bot_u, start_param=param))
+                            # التعديل الآمن والذكي لدعم روابط الـ Mini Apps والروابط العادية معاً
+                            if "startapp=" in link:
+                                param = link.split("startapp=")[1].split("&")[0]
+                                bot_u = link.split("/")[3].split("?")[0]
+                                await acc(StartBotRequest(bot=bot_u, peer=bot_u, start_param=param))
+                            elif "start=" in link:
+                                parts = link.split("/")
+                                bot_u = parts[-1].split("?")[0].replace("@", "")
+                                param = link.split("start=")[1].split("&")[0]
+                                await acc(StartBotRequest(bot=bot_u, peer=bot_u, start_param=param))
+                            else:
+                                bot_u = link.split("/")[-1].replace("@", "")
+                                await acc(StartBotRequest(bot=bot_u, peer=bot_u, start_param=""))
                         elif action == "waiting_for_folder":
                             if "addlist" in link:
                                 slug = link.split("addlist/")[-1]

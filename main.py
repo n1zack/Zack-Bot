@@ -449,40 +449,69 @@ async def handle_user_messages(event):
             user_states.pop(user_id, None)
 
         elif action == "waiting_for_phone":
-            user_states[user_id]["phone"] = text
-            user_states[user_id]["action"] = "waiting_for_code"
-            temp_client = TelegramClient(StringSession(), API_ID, API_HASH)
-            await temp_client.connect()
-            sent = await temp_client.send_code_request(text)
-            user_states[user_id]["temp_client"] = temp_client
-            user_states[user_id]["phone_code_hash"] = sent.phone_code_hash
-            await event.respond("✅ تم إرسال كود التحقق (OTP). أرسله الآن:")
+            try:
+                await event.respond("⏳ جاري الاتصال بخوادم تيليجرام وإرسال كود التحقق...")
+                temp_client = TelegramClient(StringSession(), API_ID, API_HASH)
+                await temp_client.connect()
+                
+                sent = await temp_client.send_code_request(text)
+                
+                user_states[user_id]["phone"] = text
+                user_states[user_id]["action"] = "waiting_for_code"
+                user_states[user_id]["temp_client"] = temp_client
+                user_states[user_id]["phone_code_hash"] = sent.phone_code_hash
+                
+                await event.respond(
+                    "✅ **تم إرسال كود التحقق بنجاح!**\n\n"
+                    "⚠️ ملاحظة هامة: الكود وصل إلى **تطبيق تيليجرام الرسمي** المفتوح على هذا الرقم (وليس رسالة SMS).\n"
+                    "يرجى إرسال الكود الآن:"
+                )
+            except Exception as ex:
+                logger.error(f"Error sending code to {text}: {ex}")
+                await event.respond(f"❌ فشل إرسال الكود: `{ex}`\nتأكد من صحة الرقم بالصيغة الدولية (مثل `+961...`) ومن عدم وجود حظر مؤقت.")
+                user_states.pop(user_id, None)
 
         elif action == "waiting_for_code":
             state = user_states[user_id]
-            temp_client = state["temp_client"]
-            phone = state["phone"]
+            temp_client = state.get("temp_client")
+            phone = state.get("phone")
+            code = text
+            
+            if not temp_client or not phone:
+                await event.respond("⚠️ حدث انقطاع في الجلسة المؤقتة. يرجى بدء إضافة الرقم من جديد عبر القائمة.")
+                user_states.pop(user_id, None)
+                return
+
             try:
-                await temp_client.sign_in(phone=phone, code=text, phone_code_hash=state["phone_code_hash"])
+                await temp_client.sign_in(phone=phone, code=code, phone_code_hash=state["phone_code_hash"])
                 session_string = temp_client.session.save()
                 add_user_number(user_id, phone, session_string)
                 await temp_client.disconnect()
-                await event.respond("🎉 تم تسجيل الدخول وحفظ الرقم وجلسته في قاعدة البيانات بنجاح حصرياً لك!")
+                
+                await event.respond("🎉 **تم تسجيل الدخول بنجاح!**\nتم حفظ الرقم وجلسته في قاعدة البيانات حصرياً لك.")
                 user_states.pop(user_id, None)
             except SessionPasswordNeededError:
                 user_states[user_id]["action"] = "waiting_for_password"
-                await event.respond("🔒 الحساب محمي بالتحقق بخطوتين (كلمة المرور). أرسل كلمة المرور الآن:")
+                await event.respond("🔒 **الحساب محمي بالتحقق بخطوتين (كلمة المرور).**\nأرسل كلمة المرور الخاصة بالحساب الآن:")
+            except Exception as ex:
+                await event.respond(f"❌ الكود غير صحيح أو حدث خطأ: `{ex}`\nحاول إرسال الكود مجدداً أو ابدأ من جديد.")
 
         elif action == "waiting_for_password":
             state = user_states[user_id]
-            temp_client = state["temp_client"]
-            phone = state["phone"]
-            await temp_client.sign_in(password=text)
-            session_string = temp_client.session.save()
-            add_user_number(user_id, phone, session_string)
-            await temp_client.disconnect()
-            await event.respond("🎉 تم تخطي التحقق بخطوتين وحفظ الحساب في قاعدة البيانات بنجاح تام!")
-            user_states.pop(user_id, None)
+            temp_client = state.get("temp_client")
+            phone = state.get("phone")
+            password = text
+            
+            try:
+                await temp_client.sign_in(password=password)
+                session_string = temp_client.session.save()
+                add_user_number(user_id, phone, session_string)
+                await temp_client.disconnect()
+                
+                await event.respond("🎉 **تم تخطي التحقق بخطوتين بنجاح!**\nتم حفظ الحساب وأمانه في قاعدة البيانات.")
+                user_states.pop(user_id, None)
+            except Exception as ex:
+                await event.respond(f"❌ كلمة المرور غير صحيحة: `{ex}`\nأعد إرسال كلمة المرور الصحيحة:")
 
         elif action == "waiting_for_delete":
             delete_user_number(user_id, text)
@@ -585,3 +614,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+ 

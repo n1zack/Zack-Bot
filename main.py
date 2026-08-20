@@ -262,7 +262,7 @@ async def callback_handler(event):
             await event.answer()
             nums = get_user_numbers(user_id)
             if not nums: 
-                return await event.edit("⚠️ لا توجد أرقام مسجلة لدك لفحصها.", buttons=get_back_keyboard())
+                return await event.edit("⚠️ لا توجد أرقام مسجلة لديك لفحصها.", buttons=get_back_keyboard())
             
             await event.edit("⏳ جاري فحص حالة الحسابات، يرجى الانتظار...")
             alive, dead = 0, 0
@@ -565,6 +565,7 @@ async def handle_user_messages(event):
 
                         success += 1
                 except Exception as ex:
+                    logger.error(f"Error for {phone}: {ex}")
                     fail += 1
 
             await event.respond(f"📊 **النتيجة لحساباتك الخاصة:**\n✅ نجحت: `{success}`\n❌ فشلت: `{fail}`")

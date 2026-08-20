@@ -252,6 +252,43 @@ async def callback_handler(event):
             user_states[user_id] = {"action": "waiting_for_reaction"}
             await event.edit("❤️ **تفاعل رياكشن:**\nأرسل رابط المنشور متبوعاً بالإيموجي (مثال:\n`https://t.me/channel/123 👍`)", buttons=get_back_keyboard())
 
+        # --- ميزات زاك الجديدة ---
+        elif data == "view_post":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_view"}
+            await event.edit("👀 **زيادة مشاهدات منشور:**\nأرسل رابط المنشور الآن (مثال: `https://t.me/channel/123`)", buttons=get_back_keyboard())
+
+        elif data == "check_accounts":
+            await event.answer()
+            nums = get_user_numbers(user_id)
+            if not nums: 
+                return await event.edit("⚠️ لا توجد أرقام مسجلة لدك لفحصها.", buttons=get_back_keyboard())
+            
+            await event.edit("⏳ جاري فحص حالة الحسابات، يرجى الانتظار...")
+            alive, dead = 0, 0
+            results = []
+            for phone in nums:
+                s_str = get_session_string(user_id, phone)
+                try:
+                    async with TelegramClient(StringSession(s_str), API_ID, API_HASH) as acc:
+                        await acc.get_me()
+                        alive += 1
+                        results.append(f"✅ `{phone}`: نشط")
+                except:
+                    dead += 1
+                    results.append(f"❌ `{phone}`: محذوف / خارج الخدمة")
+            await event.edit(f"📊 **حالة الحسابات:**\nالنشطة: {alive} | المتعطلة: {dead}\n\n" + "\n".join(results), buttons=get_back_keyboard())
+
+        elif data == "send_group_msg":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_group_msg"}
+            await event.edit("💬 **إرسال رسائل لمجموعة:**\nأرسل رابط المجموعة ثم الرسالة (مثال:\n`https://t.me/group_link مرحباً جميعاً`)", buttons=get_back_keyboard())
+
+        elif data == "comment_post":
+            await event.answer()
+            user_states[user_id] = {"action": "waiting_for_comment"}
+            await event.edit("✍️ **التعليق على منشور:**\nأرسل رابط المنشور ثم نص التعليق (مثال:\n`https://t.me/channel/123 منشور رائع`)", buttons=get_back_keyboard())
+
         elif data == "back_home":
             await event.answer()
             user_states.pop(user_id, None)
@@ -452,9 +489,16 @@ async def handle_user_messages(event):
             await event.respond(f"🗑️ تم حذف الرقم `{text}` من قائمتك الخاصة.")
             user_states.pop(user_id, None)
 
-        elif action in ["waiting_for_ref", "waiting_for_join", "waiting_for_leave", "waiting_for_folder", "waiting_for_reaction"]:
-            link = text.split()[0]
-            emoji = text.split()[1] if len(text.split()) > 1 else "👍"
+        # --- معالجة الميزات السابقة والجديدة معاً ---
+        elif action in [
+            "waiting_for_ref", "waiting_for_join", "waiting_for_leave", 
+            "waiting_for_folder", "waiting_for_reaction", "waiting_for_view", 
+            "waiting_for_group_msg", "waiting_for_comment"
+        ]:
+            parts = text.split(maxsplit=1)
+            link = parts[0]
+            extra_text = parts[1] if len(parts) > 1 else ""
+            emoji = extra_text if extra_text else "👍"
             
             nums = get_user_numbers(user_id)
             if not nums:
@@ -481,14 +525,13 @@ async def handle_user_messages(event):
                         elif action == "waiting_for_leave":
                             await acc(LeaveChannelRequest(link.split("/")[-1].replace("@", "")))
                         elif action == "waiting_for_ref":
-                            # التعديل الآمن والذكي لدعم روابط الـ Mini Apps والروابط العادية معاً
                             if "startapp=" in link:
                                 param = link.split("startapp=")[1].split("&")[0]
                                 bot_u = link.split("/")[3].split("?")[0]
                                 await acc(StartBotRequest(bot=bot_u, peer=bot_u, start_param=param))
                             elif "start=" in link:
-                                parts = link.split("/")
-                                bot_u = parts[-1].split("?")[0].replace("@", "")
+                                parts_link = link.split("/")
+                                bot_u = parts_link[-1].split("?")[0].replace("@", "")
                                 param = link.split("start=")[1].split("&")[0]
                                 await acc(StartBotRequest(bot=bot_u, peer=bot_u, start_param=param))
                             else:
@@ -500,11 +543,25 @@ async def handle_user_messages(event):
                                 invite = await acc(CheckChatlistInviteRequest(slug=slug))
                                 await acc(JoinChatlistInviteRequest(slug=slug, peers=invite.peers))
                         elif action == "waiting_for_reaction":
-                            parts = link.split("/")
-                            channel_username = parts[-2]
-                            msg_id = int(parts[-1])
+                            parts_link = link.split("/")
+                            channel_username = parts_link[-2]
+                            msg_id = int(parts_link[-1])
                             entity = await acc.get_entity(channel_username)
                             await acc(SendReactionRequest(peer=entity, msg_id=msg_id, reaction=[ReactionEmoji(emoticon=emoji)]))
+                        
+                        # التنفيذ للميزات الجديدة
+                        elif action == "waiting_for_view":
+                            parts_link = link.split("/")
+                            msg_id = int(parts_link[-1])
+                            channel = parts_link[-2]
+                            await acc.get_messages(channel, ids=msg_id)
+                        elif action == "waiting_for_group_msg":
+                            await acc.send_message(link, extra_text)
+                        elif action == "waiting_for_comment":
+                            parts_link = link.split("/")
+                            msg_id = int(parts_link[-1])
+                            channel = parts_link[-2]
+                            await acc.send_message(channel, extra_text, comment_to=msg_id)
 
                         success += 1
                 except Exception as ex:
@@ -527,4 +584,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

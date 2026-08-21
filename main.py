@@ -114,31 +114,33 @@ def get_subscribers():
     conn.close()
     return rows
 
-# --- واجهات وكيبوردات النظام الكاملة بالتنسيق الأصلي ---
+# --- واجهات وكيبوردات النظام المطابقة تماماً لـ Keyboards.py ---
 def get_main_keyboard(is_admin=False):
-    kb = [
-        [Button.inline("📱 أرقامي المسجلة", b"my_numbers"), Button.inline("➕ إضافة رقم جديد", b"add_number")],
-        [Button.inline("📥 رفع ملف جلسات (Zip/Txt)", b"session_login"), Button.inline("📤 تصدير جلساتي", b"export_sessions")],
-        [Button.inline("➖ حذف رقم", b"delete_number"), Button.inline("📊 حالة الحسابات", b"check_accounts")],
-        [Button.inline("🤖 تشغيل بوت (إحالة)", b"ref_bot"), Button.inline("📢 انضمام لقناة/مجموعة", b"join_chat")],
-        [Button.inline("🚪 مغادرة قناة", b"leave_chat"), Button.inline("📁 انضمام لمجلد", b"join_folder")],
-        [Button.inline("❤️ تفاعل رياكشن", b"send_reaction"), Button.inline("👀 زيادة مشاهدات", b"view_post")],
-        [Button.inline("💬 إرسال رسالة لمجموعة", b"send_group_msg"), Button.inline("✍️ تعليق على منشور", b"comment_post")],
-        [Button.inline("📊 إحصائيات النظام", b"stats")]
+    keyboard = [
+        [Button.inline("📱 أرقامي", "my_numbers"), Button.inline("➕ إضافة رقم", "add_number"), Button.inline("➖ حذف رقم", "delete_number")],
+        [Button.inline("📥 تسجيل دخول (جلسات متعددة)", "session_login"), Button.inline("📤 تصدير الجلسات (ZIP)", "export_sessions")],
+        [Button.inline("🤖 تشغيل بوت (إحالة / Mini App)", "ref_bot"), Button.inline("❤️ تفاعل رياكشن", "send_reaction")],
+        [Button.inline("📢 انضمام لقناة/مجموعة", "join_chat"), Button.inline("🚪 مغادرة قناة/مجموعة", "leave_chat")],
+        [Button.inline("📁 انضمام لمجلد", "join_folder")],
+        [Button.inline("👀 زيادة مشاهدات", "view_post"), Button.inline("🔄 فحص الحسابات", "check_accounts")],
+        [Button.inline("💬 رسالة للمجموعة", "send_group_msg"), Button.inline("✍️ تعليق على منشور", "comment_post")]
     ]
     if is_admin:
-        kb.append([Button.inline("⚙️ لوحة تحكم المشرف العام", b"admin_panel")])
-    return kb
+        keyboard.insert(0, [Button.inline("⚙️ لوحة التحكم", "admin_panel")])
+    return keyboard
 
 def get_admin_panel_keyboard():
     return [
-        [Button.inline("✅ تفعيل اشتراك مستخدم", b"sub_user"), Button.inline("👥 قائمة المشتركين", b"list_subs")],
-        [Button.inline("✉️ مراسلة مستخدم محدد", b"msg_user"), Button.inline("📢 إذاعة عامة للجميع", b"msg_all")],
-        [Button.inline("🔙 رجوع للقائمة الرئيسية", b"back_home")]
+        [Button.inline("✅ تفعيل اشتراك (ID)", "sub_user")],
+        [Button.inline("👥 قائمة المشتركين", "list_subs"), Button.inline("📊 إحصائيات", "stats")],
+        [Button.inline("✉️ رسالة لمستخدم", "msg_user"), Button.inline("📢 رسالة للكل", "msg_all")],
+        [Button.inline("🔙 رجوع للقائمة الرئيسية", "back_home")]
     ]
 
 def get_back_keyboard():
-    return [[Button.inline("🔙 رجوع للقائمة الرئيسية", b"back_home")]]
+    return [
+        [Button.inline("🔙 رجوع للقائمة الرئيسية", "back_home")]
+    ]
 
 user_states = {}
 
@@ -347,7 +349,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة ملفات الأرشيف والجلسات بدقة كاملة ومطابقة تامة ---
+# --- معالجة ملفات الأرشيف والجلسات بدقة كاملة ومطابقة تامة (المعدلة) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -383,7 +385,7 @@ async def handle_session_file(event):
                     elif (file.endswith('.txt') or '.' not in file) and not file.startswith('info_'):
                         with open(f_path, "r", encoding="utf-8", errors="ignore") as rf:
                             content = rf.read().strip()
-                            if len(content) > 50:
+                            if len(content) > 20:
                                 session_str = content
 
                     if session_str:
@@ -392,7 +394,7 @@ async def handle_session_file(event):
                         if await vc.is_user_authorized():
                             me = await vc.get_me()
                             if me and me.phone:
-                                phone_str = "+" + str(me.phone)
+                                phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
                                 add_user_number(user_id, phone_str, session_str)
                                 if phone_str not in success_numbers:
                                     success_numbers.append(phone_str)
@@ -407,7 +409,7 @@ async def handle_session_file(event):
         if success_numbers:
             await event.respond(f"✅ **تم بنجاح استخراج وحفظ ({len(success_numbers)}) رقماً في قاعدتك الخاصة:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:15]]))
         else:
-            await event.respond("⚠️ لم يتم العثور على أي جلسات صالحة تفويضياً داخل هذا الأرشيف المرسل.")
+            await event.respond("⚠️ لم يتم العثور على أي جلسات صالحة تفويضياً داخل هذا الأرشيف المرسل. تأكد من أن الجلسات نشطة وغير محذورة.")
     except Exception as e:
         logger.error(f"Error handling archive: {e}")
         await event.respond(f"❌ حدث خطأ تقني أثناء معالجة الملف: {e}")

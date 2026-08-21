@@ -316,7 +316,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة الملفات المرسلة (تم تخطي ملفات الـ info النصية ومعالجة الجلسات الحقيقية فقط) ---
+# --- معالجة الملفات المرسلة (مع كشف وتكشف محتويات الأرشيف بالكامل) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -330,19 +330,28 @@ async def handle_session_file(event):
 
         path = await event.download_media()
         filename = event.file.name or ""
-        await event.respond("📂 جاري فحص الملف واستخراج الجلسات الحقيقية...")
         
-        success_numbers = []
         extract_dir = f"temp_ext_{user_id}"
         os.makedirs(extract_dir, exist_ok=True)
         
+        found_files = []
         try:
             with zipfile.ZipFile(path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
-        except Exception:
-            if filename.endswith('.session') or filename.endswith('.txt') or '.' not in filename:
-                import shutil
-                shutil.move(path, os.path.join(extract_dir, filename if filename else "temp_session.txt"))
+                found_files = zip_ref.namelist()
+        except:
+            found_files = [filename if filename else "temp_file"]
+            import shutil
+            shutil.move(path, os.path.join(extract_dir, found_files[0]))
+
+        # إرسال قائمة الملفات المكتشفة لكي نرى تماماً ما بداخل الملف
+        files_preview = ", ".join(found_files[:15])
+        if len(found_files) > 15:
+            files_preview += " ... (والمزيد)"
+            
+        await event.respond(f"📁 **محتويات الأرشيف المكتشفة:**\n`{files_preview}`\n\n🔍 جاري الفحص واستخراج الجلسات...")
+
+        success_numbers = []
 
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
@@ -358,11 +367,10 @@ async def handle_session_file(event):
                             session_string = temp_client.session.save()
                         await temp_client.disconnect()
                     
-                    # 2. ملفات النص (تتخطى ملفات info وتفحص فقط التي تحوي كود سشن طويل وصحيح)
+                    # 2. ملفات النصوص (تتخطى ملفات info)
                     elif (file.endswith('.txt') or '.' not in file) and not file.startswith('info_'):
                         with open(file_path, "r", encoding="utf-8", errors="ignore") as rf:
                             content = rf.read().strip()
-                            # الـ StringSession عادة تبدأ بحرف معين وطولها يتجاوز 100 حرف تقريباً
                             if len(content) > 80 and not content.startswith('{') and not content.startswith('['):
                                 session_string = content
 
@@ -391,7 +399,7 @@ async def handle_session_file(event):
         if success_numbers:
             await event.respond(f"✅ **تمت إضافة الحسابات بنجاح وحفظها في قاعدتك الخاصة:**\n" + "\n".join([f"- `{n}`" for n in success_numbers]))
         else:
-            await event.respond("⚠️ لم يتم العثور على جلسات صالحة (ملاحظة: ملفات الـ info تم تجاهلها لأنها لا تحتوي على جلسات تيليجرام).")
+            await event.respond("⚠️ **تنبيه:** لم يتم العثور على أي ملفات `.session` أو نصوص جلسات صالحة داخل الملفات المعروضة أعلاه.")
 
     except Exception as e:
         logger.error(f"Error handling file: {e}")
@@ -625,8 +633,9 @@ async def main():
     asyncio.create_task(keep_alive())
     
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with fixed filters.")
+    logger.info("Zack-Bot started successfully with archive preview reader.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
     asyncio.run(main())
+ 

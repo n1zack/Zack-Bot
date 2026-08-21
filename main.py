@@ -316,7 +316,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة الملفات المرسلة (مع كشف وتكشف محتويات الأرشيف بالكامل) ---
+# --- معالجة الملفات المرسلة (بحث عميق في المجلدات الفرعية للأرشيف) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -344,15 +344,11 @@ async def handle_session_file(event):
             import shutil
             shutil.move(path, os.path.join(extract_dir, found_files[0]))
 
-        # إرسال قائمة الملفات المكتشفة لكي نرى تماماً ما بداخل الملف
-        files_preview = ", ".join(found_files[:15])
-        if len(found_files) > 15:
-            files_preview += " ... (والمزيد)"
-            
-        await event.respond(f"📁 **محتويات الأرشيف المكتشفة:**\n`{files_preview}`\n\n🔍 جاري الفحص واستخراج الجلسات...")
+        await event.respond("🔍 **جاري البحث العميق واستخراج الجلسات من كافة المجلدات الفرعية...**")
 
         success_numbers = []
 
+        # البحث التكراري العميق في كافة المجلدات الفرعية
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
                 file_path = os.path.join(root, file)
@@ -367,7 +363,7 @@ async def handle_session_file(event):
                             session_string = temp_client.session.save()
                         await temp_client.disconnect()
                     
-                    # 2. ملفات النصوص (تتخطى ملفات info)
+                    # 2. ملفات النصوص (تتخطى ملفات info وتفحص السشن الصالحة)
                     elif (file.endswith('.txt') or '.' not in file) and not file.startswith('info_'):
                         with open(file_path, "r", encoding="utf-8", errors="ignore") as rf:
                             content = rf.read().strip()
@@ -397,9 +393,9 @@ async def handle_session_file(event):
             os.remove(path)
 
         if success_numbers:
-            await event.respond(f"✅ **تمت إضافة الحسابات بنجاح وحفظها في قاعدتك الخاصة:**\n" + "\n".join([f"- `{n}`" for n in success_numbers]))
+            await event.respond(f"✅ **تمت إضافة وحفظ ({len(success_numbers)}) حساباً بنجاح في قاعدتك الخاصة:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:10]]))
         else:
-            await event.respond("⚠️ **تنبيه:** لم يتم العثور على أي ملفات `.session` أو نصوص جلسات صالحة داخل الملفات المعروضة أعلاه.")
+            await event.respond("⚠️ لم يتم العثور على جلسات صالحة أو قد تكون الحسابات غير مصرحة داخل هذه الملفات.")
 
     except Exception as e:
         logger.error(f"Error handling file: {e}")
@@ -633,7 +629,7 @@ async def main():
     asyncio.create_task(keep_alive())
     
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with archive preview reader.")
+    logger.info("Zack-Bot started successfully with deep recursive session parsing.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

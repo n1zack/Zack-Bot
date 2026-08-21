@@ -316,7 +316,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة الملفات المرسلة وحفظها كـ StringSession (تم التعديل والتحسين لقراءة الملفات الخارجية بدقة) ---
+# --- معالجة الملفات المرسلة (تم تحديثها بالبحث العميق والشامل لتقبل كافة الملفات الخارجية والملفات النصية) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -333,62 +333,68 @@ async def handle_session_file(event):
         await event.respond("📂 جاري فحص الملف واستخراج الجلسات بدقة سحابياً...")
         
         success_numbers = []
+        extract_dir = f"temp_ext_{user_id}"
+        os.makedirs(extract_dir, exist_ok=True)
         
-        if filename.endswith('.zip') or path.endswith('.zip'):
-            extract_dir = f"temp_ext_{user_id}"
-            os.makedirs(extract_dir, exist_ok=True)
+        try:
             with zipfile.ZipFile(path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
-                
-                # البحث الشامل والعميق في كافة المجلدات الفرعية
-                for root, dirs, files in os.walk(extract_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        session_string = ""
-                        
-                        try:
-                            # 1. إذا كان ملف جلسة SQLite (.session)
-                            if file.endswith('.session'):
-                                temp_client = TelegramClient(file_path, API_ID, API_HASH)
-                                await temp_client.connect()
-                                if await temp_client.is_user_authorized():
-                                    session_string = temp_client.session.save()
-                                await temp_client.disconnect()
-                            
-                            # 2. إذا كان ملف نصي (.txt) - نتحقق أنه StringSession حقيقي وليس ملف معلومات
-                            elif file.endswith('.txt') and not "info" in file.lower():
-                                with open(file_path, "r", encoding="utf-8") as rf:
-                                    content = rf.read().strip()
-                                    if len(content) > 50:
-                                        session_string = content
+        except Exception as zip_err:
+            logger.error(f"Not a valid zip or direct file: {zip_err}")
+            # إذا لم يكن ملف مضغوط، ربما يكون ملفاً منفرداً تم إرساله مباشرة
+            if filename.endswith('.session') or filename.endswith('.txt') or '.' not in filename:
+                import shutil
+                shutil.move(path, os.path.join(extract_dir, filename if filename else "temp_session.txt"))
 
-                            # التحقق النهائي وحفظ الجلسة إن كانت صالحة
-                            if session_string:
-                                verify_client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
-                                await verify_client.connect()
-                                if await verify_client.is_user_authorized():
-                                    me = await verify_client.get_me()
-                                    if me and me.phone:
-                                        p_str = "+" + str(me.phone)
-                                        add_user_number(user_id, p_str, session_string)
-                                        if p_str not in success_numbers:
-                                            success_numbers.append(p_str)
-                                await verify_client.disconnect()
-                                
-                        except Exception as ex:
-                            logger.error(f"Error parsing file {file}: {ex}")
+        # البحث الشامل والعميق في كافة المجلدات والملفات الفرعية بدون استثناء
+        for root, dirs, files in os.walk(extract_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                session_string = ""
+                
+                try:
+                    # 1. فحص ملفات الـ session
+                    if file.endswith('.session'):
+                        temp_client = TelegramClient(file_path, API_ID, API_HASH)
+                        await temp_client.connect()
+                        if await temp_client.is_user_authorized():
+                            session_string = temp_client.session.save()
+                        await temp_client.disconnect()
+                    
+                    # 2. فحص الملفات النصية أو التكست الخارجية
+                    elif file.endswith('.txt') or '.' not in file:
+                        with open(file_path, "r", encoding="utf-8", errors="ignore") as rf:
+                            content = rf.read().strip()
+                            if len(content) > 30:
+                                session_string = content
+
+                    # التحقق والاعتماد النهائي للحساب
+                    if session_string:
+                        verify_client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
+                        await verify_client.connect()
+                        if await verify_client.is_user_authorized():
+                            me = await verify_client.get_me()
+                            if me and me.phone:
+                                p_str = "+" + str(me.phone)
+                                add_user_number(user_id, p_str, session_string)
+                                if p_str not in success_numbers:
+                                    success_numbers.append(p_str)
+                        await verify_client.disconnect()
                             
-            import shutil
-            if os.path.exists(extract_dir):
-                shutil.rmtree(extract_dir)
+                except Exception as ex:
+                    logger.error(f"Error parsing file internal {file}: {ex}")
+                    
+        import shutil
+        if os.path.exists(extract_dir):
+            shutil.rmtree(extract_dir)
+        if os.path.exists(path):
+            os.remove(path)
 
         if success_numbers:
             await event.respond(f"✅ تمت إضافة الحسابات بنجاح وحفظها في قاعدتك الخاصة:\n" + "\n".join([f"- `{n}`" for n in success_numbers]))
         else:
             await event.respond("⚠️ لم يتم العثور على جلسات صالحة أو مطابقة للشروط داخل الملف المرفق.")
 
-        if os.path.exists(path): 
-            os.remove(path)
     except Exception as e:
         logger.error(f"Error handling file: {e}")
         await event.respond(f"❌ حدث خطأ أثناء معالجة الملف: {e}")
@@ -626,4 +632,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

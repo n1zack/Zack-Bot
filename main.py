@@ -316,7 +316,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة الملفات المرسلة (تم تحديثها بالبحث العميق والشامل لتقبل كافة الملفات الخارجية والملفات النصية) ---
+# --- معالجة الملفات المرسلة (مع نظام التقرير والتشخيص الذكي للخطأ) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -330,46 +330,55 @@ async def handle_session_file(event):
 
         path = await event.download_media()
         filename = event.file.name or ""
-        await event.respond("📂 جاري فحص الملف واستخراج الجلسات بدقة سحابياً...")
+        await event.respond("🔍 **جاري فحص الملف وتشخيص محتوياته بدقة...**")
         
         success_numbers = []
+        debug_info = []
         extract_dir = f"temp_ext_{user_id}"
         os.makedirs(extract_dir, exist_ok=True)
         
+        is_zip = False
         try:
             with zipfile.ZipFile(path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
+                is_zip = True
+                debug_info.append(f"📦 نوع الملف: أرشيف ZIP يحتوي على الملفات التالية: {zip_ref.namelist()}")
         except Exception as zip_err:
-            logger.error(f"Not a valid zip or direct file: {zip_err}")
-            # إذا لم يكن ملف مضغوط، ربما يكون ملفاً منفرداً تم إرساله مباشرة
+            debug_info.append(f"⚠️ لم يتم التعرف عليه كملف ZIP قياسي: {zip_err}")
             if filename.endswith('.session') or filename.endswith('.txt') or '.' not in filename:
                 import shutil
                 shutil.move(path, os.path.join(extract_dir, filename if filename else "temp_session.txt"))
+                debug_info.append("📄 تم التعامل معه كملف فردي مباشر.")
 
-        # البحث الشامل والعميق في كافة المجلدات والملفات الفرعية بدون استثناء
+        # الفحص الشامل مع تسجيل أسباب الرفض لكل ملف
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
                 file_path = os.path.join(root, file)
                 session_string = ""
                 
                 try:
-                    # 1. فحص ملفات الـ session
                     if file.endswith('.session'):
+                        debug_info.append(f"🔎 وجد ملف SQLite session: {file}")
                         temp_client = TelegramClient(file_path, API_ID, API_HASH)
                         await temp_client.connect()
                         if await temp_client.is_user_authorized():
                             session_string = temp_client.session.save()
+                            debug_info.append(f"✅ الجلسة في {file} صالحة ومصرحة!")
+                        else:
+                            debug_info.append(f"❌ الجلسة في {file} غير مصرحة (غير تسجيل دخول).")
                         await temp_client.disconnect()
-                    
-                    # 2. فحص الملفات النصية أو التكست الخارجية
+                        
                     elif file.endswith('.txt') or '.' not in file:
                         with open(file_path, "r", encoding="utf-8", errors="ignore") as rf:
                             content = rf.read().strip()
-                            if len(content) > 30:
+                            debug_info.append(f"📝 وجد ملف نصي {file} (طول النص: {len(content)})")
+                            if len(content) > 20: # تم تخفيف الشرط مؤقتاً للتأكد من القراءة
                                 session_string = content
+                            else:
+                                debug_info.append(f"⚠️ الملف {file} فارغ أو نصه قصير جداً.")
 
-                    # التحقق والاعتماد النهائي للحساب
                     if session_string:
+                        debug_info.append(f"🚀 جاري التحقق من صلاحية StringSession المستخرجة...")
                         verify_client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
                         await verify_client.connect()
                         if await verify_client.is_user_authorized():
@@ -379,9 +388,13 @@ async def handle_session_file(event):
                                 add_user_number(user_id, p_str, session_string)
                                 if p_str not in success_numbers:
                                     success_numbers.append(p_str)
+                                debug_info.append(f"🎉 تم بنجاح ربط الرقم: {p_str}")
+                        else:
+                            debug_info.append(f"❌ الـ StringSession غير صالحة أو منتهية الصلاحية لدى تيليجرام.")
                         await verify_client.disconnect()
-                            
+                        
                 except Exception as ex:
+                    debug_info.append(f"🚨 استثناء تقريبي خطير أثناء معالجة الملف {file}: {str(ex)}")
                     logger.error(f"Error parsing file internal {file}: {ex}")
                     
         import shutil
@@ -393,11 +406,15 @@ async def handle_session_file(event):
         if success_numbers:
             await event.respond(f"✅ تمت إضافة الحسابات بنجاح وحفظها في قاعدتك الخاصة:\n" + "\n".join([f"- `{n}`" for n in success_numbers]))
         else:
-            await event.respond("⚠️ لم يتم العثور على جلسات صالحة أو مطابقة للشروط داخل الملف المرفق.")
+            # تقرير التشخيص الذكي المفصل ليخبرك بالضبط مالذي حصل
+            report_text = "⚠️ **تقرير التشخيص (لماذا لم يتم التعرف على الجلسات؟):**\n\n" + "\n".join(debug_info[-10:]) # آخر 10 أسطر تفصيلية
+            if len(report_text) > 4000:
+                report_text = report_text[:4000]
+            await event.respond(report_text)
 
     except Exception as e:
         logger.error(f"Error handling file: {e}")
-        await event.respond(f"❌ حدث خطأ أثناء معالجة الملف: {e}")
+        await event.respond(f"❌ حدث خطأ عام أثناء معالجة الملف:\n`{str(e)}`")
 
 # --- معالجة الرسائل النصية وحالات التفاعل ---
 @client.on(events.NewMessage(incoming=True))
@@ -627,8 +644,9 @@ async def main():
     asyncio.create_task(keep_alive())
     
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Zack-Bot started successfully with fixed export/import sessions.")
+    logger.info("Zack-Bot started successfully with debug session reader.")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":
     asyncio.run(main())
+ 

@@ -252,7 +252,7 @@ async def callback_handler(event):
             user_states[user_id] = {"action": "waiting_for_reaction"}
             await event.edit("❤️ **تفاعل رياكشن:**\nأرسل رابط المنشور متبوعاً بالإيموجي (مثال:\n`https://t.me/channel/123 👍`)", buttons=get_back_keyboard())
 
-        # --- ميزات زاك الجديدة ---
+        # --- ميزات زاك الإضافية ---
         elif data == "view_post":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_view"}
@@ -316,7 +316,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة الملفات المرسلة وحفظها كـ StringSession ---
+# --- معالجة الملفات المرسلة وحفظها كـ StringSession (تم التعديل والتحسين لقراءة الملفات الخارجية بدقة) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -330,7 +330,7 @@ async def handle_session_file(event):
 
         path = await event.download_media()
         filename = event.file.name or ""
-        await event.respond("📂 جاري فحص الملف وحفظ الجلسات سحابياً في قاعدة البيانات...")
+        await event.respond("📂 جاري فحص الملف واستخراج الجلسات بدقة سحابياً...")
         
         success_numbers = []
         
@@ -339,46 +339,59 @@ async def handle_session_file(event):
             os.makedirs(extract_dir, exist_ok=True)
             with zipfile.ZipFile(path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
+                
+                # البحث الشامل والعميق في كافة المجلدات الفرعية
                 for root, dirs, files in os.walk(extract_dir):
                     for file in files:
-                        if file.endswith('.session') or file.endswith('.txt'):
-                            file_path = os.path.join(root, file)
-                            try:
-                                session_string = ""
-                                if file.endswith('.txt'):
-                                    with open(file_path, "r", encoding="utf-8") as rf:
-                                        session_string = rf.read().strip()
-                                else:
-                                    temp_client = TelegramClient(file_path, API_ID, API_HASH)
-                                    await temp_client.connect()
-                                    if await temp_client.is_user_authorized():
-                                        session_string = temp_client.session.save()
-                                    await temp_client.disconnect()
+                        file_path = os.path.join(root, file)
+                        session_string = ""
+                        
+                        try:
+                            # 1. إذا كان ملف جلسة SQLite (.session)
+                            if file.endswith('.session'):
+                                temp_client = TelegramClient(file_path, API_ID, API_HASH)
+                                await temp_client.connect()
+                                if await temp_client.is_user_authorized():
+                                    session_string = temp_client.session.save()
+                                await temp_client.disconnect()
+                            
+                            # 2. إذا كان ملف نصي (.txt) - نتحقق أنه StringSession حقيقي وليس ملف معلومات
+                            elif file.endswith('.txt') and not "info" in file.lower():
+                                with open(file_path, "r", encoding="utf-8") as rf:
+                                    content = rf.read().strip()
+                                    if len(content) > 50:
+                                        session_string = content
 
-                                if session_string:
-                                    verify_client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
-                                    await verify_client.connect()
-                                    if await verify_client.is_user_authorized():
-                                        me = await verify_client.get_me()
-                                        if me and me.phone:
-                                            p_str = "+" + str(me.phone)
-                                            add_user_number(user_id, p_str, session_string)
+                            # التحقق النهائي وحفظ الجلسة إن كانت صالحة
+                            if session_string:
+                                verify_client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
+                                await verify_client.connect()
+                                if await verify_client.is_user_authorized():
+                                    me = await verify_client.get_me()
+                                    if me and me.phone:
+                                        p_str = "+" + str(me.phone)
+                                        add_user_number(user_id, p_str, session_string)
+                                        if p_str not in success_numbers:
                                             success_numbers.append(p_str)
-                                    await verify_client.disconnect()
-                            except Exception as ex:
-                                logger.error(f"Error parsing session file {file}: {ex}")
+                                await verify_client.disconnect()
+                                
+                        except Exception as ex:
+                            logger.error(f"Error parsing file {file}: {ex}")
+                            
             import shutil
             if os.path.exists(extract_dir):
                 shutil.rmtree(extract_dir)
 
         if success_numbers:
-            await event.respond(f"✅ تمت إضافة الحسابات وحفظها في قاعدة البيانات بنجاح حصرياً لك:\n" + "\n".join([f"- `{n}`" for n in success_numbers]))
+            await event.respond(f"✅ تمت إضافة الحسابات بنجاح وحفظها في قاعدتك الخاصة:\n" + "\n".join([f"- `{n}`" for n in success_numbers]))
         else:
-            await event.respond("⚠️ لم يتم التعرف على حسابات صالحة داخل الملف المرفق.")
+            await event.respond("⚠️ لم يتم العثور على جلسات صالحة أو مطابقة للشروط داخل الملف المرفق.")
 
-        if os.path.exists(path): os.remove(path)
+        if os.path.exists(path): 
+            os.remove(path)
     except Exception as e:
         logger.error(f"Error handling file: {e}")
+        await event.respond(f"❌ حدث خطأ أثناء معالجة الملف: {e}")
 
 # --- معالجة الرسائل النصية وحالات التفاعل ---
 @client.on(events.NewMessage(incoming=True))
@@ -518,7 +531,7 @@ async def handle_user_messages(event):
             await event.respond(f"🗑️ تم حذف الرقم `{text}` من قائمتك الخاصة.")
             user_states.pop(user_id, None)
 
-        # --- معالجة الميزات السابقة والجديدة معاً ---
+        # --- معالجة الميزات الأخرى والتفاعلات ---
         elif action in [
             "waiting_for_ref", "waiting_for_join", "waiting_for_leave", 
             "waiting_for_folder", "waiting_for_reaction", "waiting_for_view", 
@@ -578,7 +591,6 @@ async def handle_user_messages(event):
                             entity = await acc.get_entity(channel_username)
                             await acc(SendReactionRequest(peer=entity, msg_id=msg_id, reaction=[ReactionEmoji(emoticon=emoji)]))
                         
-                        # التنفيذ للميزات الجديدة
                         elif action == "waiting_for_view":
                             parts_link = link.split("/")
                             msg_id = int(parts_link[-1])

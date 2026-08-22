@@ -16,6 +16,9 @@ from telethon.tl.functions.chatlists import JoinChatlistInviteRequest, CheckChat
 from telethon.tl.functions.messages import SendReactionRequest
 from telethon.tl.types import ReactionEmoji
 
+# استدعاء دوال ملف الترجمات الخارجي
+from langs import t, toggle_user_lang, get_user_lang
+
 # إعدادات التسجيل الشاملة
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -166,32 +169,33 @@ def get_subscribers():
     conn.close()
     return rows
 
-# --- واجهات وكيبوردات النظام ---
-def get_main_keyboard(is_admin=False):
+# --- واجهات وكيبوردات النظام المحدثة مع دعم اللغات ---
+def get_main_keyboard(user_id, is_admin=False):
     keyboard = [
-        [Button.inline("📱 أرقامي", "my_numbers"), Button.inline("➕ إضافة رقم", "add_number"), Button.inline("➖ حذف رقم", "del_page_0")],
-        [Button.inline("📥 تسجيل دخول (جلسات متعددة)", "session_login"), Button.inline("📤 تصدير الجلسات (ZIP)", "export_sessions")],
-        [Button.inline("🤖 تشغيل بوت (إحالة / Mini App)", "ref_bot"), Button.inline("❤️ تفاعل رياكشن", "send_reaction")],
-        [Button.inline("📢 انضمام لقناة/مجموعة", "join_chat"), Button.inline("🚪 مغادرة قناة/مجموعة", "leave_chat")],
-        [Button.inline("📁 انضمام لمجلد", "join_folder")],
-        [Button.inline("👀 زيادة مشاهدات", "view_post"), Button.inline("🔄 فحص وتنظيف الحسابات", "check_accounts")],
-        [Button.inline("💬 رسالة للمجموعة", "send_group_msg"), Button.inline("✍️ تعليق على منشور", "comment_post")]
+        [Button.inline(t(user_id, 'btn_my_numbers'), "my_numbers"), Button.inline(t(user_id, 'btn_add_number'), "add_number"), Button.inline(t(user_id, 'btn_del_number'), "del_page_0")],
+        [Button.inline(t(user_id, 'btn_session_login'), "session_login"), Button.inline(t(user_id, 'btn_export_sessions'), "export_sessions")],
+        [Button.inline(t(user_id, 'btn_ref_bot'), "ref_bot"), Button.inline(t(user_id, 'btn_reaction'), "send_reaction")],
+        [Button.inline(t(user_id, 'btn_join_chat'), "join_chat"), Button.inline(t(user_id, 'btn_leave_chat'), "leave_chat")],
+        [Button.inline(t(user_id, 'btn_join_folder'), "join_folder")],
+        [Button.inline(t(user_id, 'btn_view_post'), "view_post"), Button.inline(t(user_id, 'btn_check_accounts'), "check_accounts")],
+        [Button.inline(t(user_id, 'btn_group_msg'), "send_group_msg"), Button.inline(t(user_id, 'btn_comment_post'), "comment_post")],
+        [Button.inline(t(user_id, 'btn_lang_switch'), "switch_language")]
     ]
     if is_admin:
-        keyboard.insert(0, [Button.inline("⚙️ لوحة التحكم", "admin_panel")])
+        keyboard.insert(0, [Button.inline(t(user_id, 'btn_admin_panel'), "admin_panel")])
     return keyboard
 
-def get_admin_panel_keyboard():
+def get_admin_panel_keyboard(user_id):
     return [
-        [Button.inline("✅ تفعيل اشتراك (ID)", "sub_user")],
-        [Button.inline("👥 قائمة المشتركين", "list_subs"), Button.inline("📊 إحصائيات", "stats")],
-        [Button.inline("✉️ رسالة لمستخدم", "msg_user"), Button.inline("📢 رسالة للكل", "msg_all")],
-        [Button.inline("🔙 رجوع للقائمة الرئيسية", "back_home")]
+        [Button.inline(t(user_id, 'btn_sub_user'), "sub_user")],
+        [Button.inline(t(user_id, 'btn_list_subs'), "list_subs"), Button.inline(t(user_id, 'btn_stats'), "stats")],
+        [Button.inline(t(user_id, 'btn_msg_user'), "msg_user"), Button.inline(t(user_id, 'btn_msg_all'), "msg_all")],
+        [Button.inline(t(user_id, 'btn_back'), "back_home")]
     ]
 
-def get_back_keyboard():
+def get_back_keyboard(user_id):
     return [
-        [Button.inline("🔙 رجوع للقائمة الرئيسية", "back_home")]
+        [Button.inline(t(user_id, 'btn_back'), "back_home")]
     ]
 
 user_states = {}
@@ -237,18 +241,16 @@ async def start(event):
         user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
         
         if not is_admin and not is_subscribed(user_id):
-            await event.respond(
-                f"⚠️ **أنت غير مشترك في البوت.**\nمعرفك (ID): `{user_id}`\nقم بالتواصل مع @n1zack لتفعيل اشتراكك.",
-                buttons=get_back_keyboard()
-            )
+            not_sub_text = t(user_id, 'not_subscribed').format(user_id=user_id)
+            await event.respond(not_sub_text, buttons=get_back_keyboard(user_id))
             return
 
         if is_admin:
-            welcome_text = f"👑 **مرحباً بك مجدداً يا زاك (المشرف العام)**\nمعرفك الشخصي (ID): `{user_id}`\n\nاختر العملية المطلوبة من القائمة أدناه:"
+            welcome_text = t(user_id, 'admin_welcome').format(user_id=user_id)
         else:
-            welcome_text = f"👋 **مرحباً بك {user_name}**\nمعرفك الشخصي (ID): `{user_id}`\n\nاختر العملية المطلوبة من القائمة أدناه:"
+            welcome_text = t(user_id, 'user_welcome').format(user_name=user_name, user_id=user_id)
             
-        await event.respond(welcome_text, buttons=get_main_keyboard(is_admin))
+        await event.respond(welcome_text, buttons=get_main_keyboard(user_id, is_admin))
     except Exception as e:
         logger.error(f"Error in start command: {e}")
 
@@ -258,6 +260,19 @@ async def callback_handler(event):
         data = event.data.decode('utf-8')
         user_id = event.sender_id
         
+        if data == "switch_language":
+            toggle_user_lang(user_id)
+            await event.answer("✅ تم تغيير اللغة بنجاح!", alert=True)
+            is_admin = (user_id == ADMIN_ID)
+            sender = await event.get_sender()
+            user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
+            if is_admin:
+                welcome_text = t(user_id, 'admin_welcome').format(user_id=user_id)
+            else:
+                welcome_text = t(user_id, 'user_welcome').format(user_name=user_name, user_id=user_id)
+            await event.edit(welcome_text, buttons=get_main_keyboard(user_id, is_admin))
+            return
+
         if not data.startswith("del_page_") and not data.startswith("del_num_") and data not in ["back_home", "admin_panel"] and user_id != ADMIN_ID and not is_subscribed(user_id):
             await event.answer("⚠️ عذراً، اشتراكك غير مفعل في النظام!", alert=True)
             return
@@ -265,50 +280,50 @@ async def callback_handler(event):
         if data == "admin_panel":
             if user_id != ADMIN_ID: return
             await event.answer()
-            await event.edit("⚙️ **لوحة تحكم المشرف العام:**\nاختر الإجراء المناسب:", buttons=get_admin_panel_keyboard())
+            await event.edit(t(user_id, 'admin_title'), buttons=get_admin_panel_keyboard(user_id))
 
         elif data == "sub_user":
             if user_id != ADMIN_ID: return
             user_states[user_id] = {"action": "waiting_for_sub"}
             await event.answer()
-            await event.edit("✅ **تفعيل اشتراك مستخدم:**\nأرسل بالصيغة التالية:\n`ID [أيدي_المستخدم] [عدد_الأيام] d`\nمثال: `ID 123456789 30 d`", buttons=get_back_keyboard())
+            await event.edit("✅ **تفعيل اشتراك مستخدم:**\nأرسل بالصيغة التالية:\n`ID [أيدي_المستخدم] [عدد_الأيام] d`\nمثال: `ID 123456789 30 d`", buttons=get_back_keyboard(user_id))
 
         elif data == "list_subs":
             if user_id != ADMIN_ID: return
             subs = get_subscribers()
             text = "👥 **قائمة المشتركين النشطين:**\n\n" + ("\n".join([f"👤 ID: `{s[0]}` | ⏳ ينتهي في: `{s[1]}`" for s in subs]) if subs else "لا توجد أي اشتراكات مسجلة حالياً.")
             await event.answer()
-            await event.edit(text, buttons=get_back_keyboard())
+            await event.edit(text, buttons=get_back_keyboard(user_id))
 
         elif data == "stats":
             if user_id != ADMIN_ID: return
             total_users = get_total_bot_users()
             subs = get_subscribers()
             await event.answer()
-            await event.edit(f"📊 **إحصائيات النظام الشاملة:**\n- إجمالي الأشخاص الذين فتحوا البوت: `{total_users}` شخص\n- إجمالي المشتركين النشطين: `{len(subs)}` مشترك\n- حالة الاتصال: مستقر ويعمل بكفاءة سحابياً عبر Neon ✅", buttons=get_back_keyboard())
+            await event.edit(f"📊 **إحصائيات النظام الشاملة:**\n- إجمالي الأشخاص الذين فتحوا البوت: `{total_users}` شخص\n- إجمالي المشتركين النشطين: `{len(subs)}` مشترك\n- حالة الاتصال: مستقر ويعمل بكفاءة سحابياً عبر Neon ✅", buttons=get_back_keyboard(user_id))
 
         elif data == "msg_user":
             if user_id != ADMIN_ID: return
             user_states[user_id] = {"action": "waiting_for_msg_user"}
             await event.answer()
-            await event.edit("✉️ **مراسلة مستخدم محدد:**\nأرسل بالصيغة:\n`[ID_المستخدم] [نص_الرسالة]`", buttons=get_back_keyboard())
+            await event.edit("✉️ **مراسلة مستخدم محدد:**\nأرسل بالصيغة:\n`[ID_المستخدم] [نص_الرسالة]`", buttons=get_back_keyboard(user_id))
 
         elif data == "msg_all":
             if user_id != ADMIN_ID: return
             user_states[user_id] = {"action": "waiting_for_msg_all"}
             await event.answer()
-            await event.edit("📢 **إذاعة عامة:**\nأرسل نص الإذاعة الذي تريد إرساله لكافة المستخدمين الآن:", buttons=get_back_keyboard())
+            await event.edit("📢 **إذاعة عامة:**\nأرسل نص الإذاعة الذي تريد إرساله لكافة المستخدمين الآن:", buttons=get_back_keyboard(user_id))
 
         elif data == "my_numbers":
             await event.answer()
             numbers = get_user_numbers(user_id)
             text = f"📱 **أرقامك المسجلة في القاعدة السحابية:**\n\n" + ("\n".join([f"📱 `{n}`" for n in numbers]) if numbers else "لا توجد أرقام مسجلة لديك حالياً.")
-            await event.edit(text, buttons=get_back_keyboard())
+            await event.edit(text, buttons=get_back_keyboard(user_id))
         
         elif data == "add_number":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_phone"}
-            await event.edit("➕ **إضافة رقم جديد:**\nأرسل رقم الهاتف بالصيغة الدولية الكاملة (مثال: `+961...`)", buttons=get_back_keyboard())
+            await event.edit("➕ **إضافة رقم جديد:**\nأرسل رقم الهاتف بالصيغة الدولية الكاملة (مثال: `+961...`)", buttons=get_back_keyboard(user_id))
             
         elif data.startswith("del_page_"):
             await event.answer()
@@ -316,10 +331,10 @@ async def callback_handler(event):
             numbers = get_user_numbers(user_id)
             
             if not numbers:
-                await event.edit("⚠️ لا توجد أي أرقام مسجلة لحذفها.", buttons=get_back_keyboard())
+                await event.edit("⚠️ لا توجد أي أرقام مسجلة لحذفها.", buttons=get_back_keyboard(user_id))
                 return
                 
-            per_page = 6  # 3 صفوف × 2 أزرار بجانب بعض
+            per_page = 6  
             total_pages = (len(numbers) + per_page - 1) // per_page
             page = max(0, min(page, total_pages - 1))
             
@@ -337,13 +352,13 @@ async def callback_handler(event):
                 
             nav_buttons = []
             if page > 0:
-                nav_buttons.append(Button.inline("⬅️ السابق", f"del_page_{page - 1}"))
+                nav_buttons.append(Button.inline(t(user_id, 'btn_prev'), f"del_page_{page - 1}"))
             if page < total_pages - 1:
-                nav_buttons.append(Button.inline("التالي ➡️", f"del_page_{page + 1}"))
+                nav_buttons.append(Button.inline(t(user_id, 'btn_next'), f"del_page_{page + 1}"))
             if nav_buttons:
                 keyboard.append(nav_buttons)
                 
-            keyboard.append([Button.inline("🔙 رجوع للقائمة الرئيسية", "back_home")])
+            keyboard.append([Button.inline(t(user_id, 'btn_back'), "back_home")])
             
             await event.edit(f"➖ **قائمة أرقامك (الصفحة {page + 1} من {total_pages}):**\nانقر على زر الرقم أدناه لحذفه فوراً:", buttons=keyboard)
 
@@ -355,10 +370,9 @@ async def callback_handler(event):
             delete_user_number(user_id, phone_to_delete)
             await event.answer(f"✅ تم حذف الرقم {phone_to_delete} بنجاح!", alert=True)
             
-            # إعادة توجيه لنفس نظام الصفحات المحدث
             numbers = get_user_numbers(user_id)
             if not numbers:
-                await event.edit("⚠️ لقد قمت بحذف كافة أرقامك. لم يتبق أي رقم مسجل.", buttons=get_back_keyboard())
+                await event.edit("⚠️ لقد قمت بحذف كافة أرقامك. لم يتبق أي رقم مسجل.", buttons=get_back_keyboard(user_id))
                 return
                 
             per_page = 6
@@ -378,24 +392,24 @@ async def callback_handler(event):
                 
             nav_buttons = []
             if page > 0:
-                nav_buttons.append(Button.inline("⬅️ السابق", f"del_page_{page - 1}"))
+                nav_buttons.append(Button.inline(t(user_id, 'btn_prev'), f"del_page_{page - 1}"))
             if page < total_pages - 1:
-                nav_buttons.append(Button.inline("التالي ➡️", f"del_page_{page + 1}"))
+                nav_buttons.append(Button.inline(t(user_id, 'btn_next'), f"del_page_{page + 1}"))
             if nav_buttons:
                 keyboard.append(nav_buttons)
                 
-            keyboard.append([Button.inline("🔙 رجوع للقائمة الرئيسية", "back_home")])
+            keyboard.append([Button.inline(t(user_id, 'btn_back'), "back_home")])
             
             await event.edit(f"➖ **قائمة أرقامك (الصفحة {page + 1} من {total_pages}):**\nانقر على زر الرقم أدناه لحذفه فوراً:", buttons=keyboard)
 
         elif data == "session_login":
             await event.answer()
-            await event.edit("📥 **رفع ملف الجلسات:**\nأرسل ملف الأرشيف بصيغة `zip` أو ملف نصي يحتوي على الجلسات أو ملفات `.session` وسأقوم بسحب الأرقام وحفظها سحابياً فوراً:", buttons=get_back_keyboard())
+            await event.edit("📥 **رفع ملف الجلسات:**\nأرسل ملف الأرشيف بصيغة `zip` أو ملف نصي يحتوي على الجلسات أو ملفات `.session` وسأقوم بسحب الأرقام وحفظها سحابياً فوراً:", buttons=get_back_keyboard(user_id))
             
         elif data == "export_sessions":
             await event.answer()
             nums = get_user_numbers(user_id)
-            if not nums: return await event.edit("⚠️ لا توجد أرقام مسجلة لتصدير جلساتها.", buttons=get_back_keyboard())
+            if not nums: return await event.edit("⚠️ لا توجد أرقام مسجلة لتصدير جلساتها.", buttons=get_back_keyboard(user_id))
             
             zip_filename = f"sessions_{user_id}.zip"
             with zipfile.ZipFile(zip_filename, 'w') as zipf:
@@ -408,42 +422,42 @@ async def callback_handler(event):
                         os.remove(t_name)
             await event.respond(file=zip_filename)
             os.remove(zip_filename)
-            await event.edit("✅ تم تصدير كافة جلساتك وإرسالها كملف مضغوط بنجاح!", buttons=get_back_keyboard())
+            await event.edit("✅ تم تصدير كافة جلساتك وإرسالها كملف مضغوط بنجاح!", buttons=get_back_keyboard(user_id))
 
         elif data == "ref_bot":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_ref"}
-            await event.edit("🤖 **تشغيل بوت إحالة:**\nأرسل رابط الإحالة أو رابط البوت المطلوب:", buttons=get_back_keyboard())
+            await event.edit("🤖 **تشغيل بوت إحالة:**\nأرسل رابط الإحالة أو رابط البوت المطلوب:", buttons=get_back_keyboard(user_id))
 
         elif data == "join_chat":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_join"}
-            await event.edit("📢 **انضمام لقناة أو مجموعة:**\nأرسل رابط القناة أو المجموعة للانضمام إليها بكافة حساباتك:", buttons=get_back_keyboard())
+            await event.edit("📢 **انضمام لقناة أو مجموعة:**\nأرسل رابط القناة أو المجموعة للانضمام إليها بكافة حساباتك:", buttons=get_back_keyboard(user_id))
             
         elif data == "leave_chat":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_leave"}
-            await event.edit("🚪 **مغادرة قناة أو مجموعة:**\nأرسل رابط القناة للمغادرة:", buttons=get_back_keyboard())
+            await event.edit("🚪 **مغادرة قناة أو مجموعة:**\nأرسل رابط القناة للمغادرة:", buttons=get_back_keyboard(user_id))
             
         elif data == "join_folder":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_folder"}
-            await event.edit("📁 **انضمام لمجلد:**\nأرسل رابط المجلد المطلوب:", buttons=get_back_keyboard())
+            await event.edit("📁 **انضمام لمجلد:**\nأرسل رابط المجلد المطلوب:", buttons=get_back_keyboard(user_id))
 
         elif data == "send_reaction":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_reaction"}
-            await event.edit("❤️ **تفاعل رياكشن:**\nأرسل رابط المنشور متبوعاً بالإيموجي (مثال: `https://t.me/... 👍`):", buttons=get_back_keyboard())
+            await event.edit("❤️ **تفاعل رياكشن:**\nأرسل رابط المنشور متبوعاً بالإيموجي (مثال: `https://t.me/... 👍`):", buttons=get_back_keyboard(user_id))
 
         elif data == "view_post":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_view"}
-            await event.edit("👀 **زيادة مشاهدات:**\nأرسل رابط المنشور لزيادة عدد المشاهدات عبر حساباتك:", buttons=get_back_keyboard())
+            await event.edit("👀 **زيادة مشاهدات:**\nأرسل رابط المنشور لزيادة عدد المشاهدات عبر حساباتك:", buttons=get_back_keyboard(user_id))
 
         elif data == "check_accounts":
             await event.answer()
             nums = get_user_numbers(user_id)
-            if not nums: return await event.edit("⚠️ لا توجد أرقام مسجلة لفحصها.", buttons=get_back_keyboard())
+            if not nums: return await event.edit("⚠️ لا توجد أرقام مسجلة لفحصها.", buttons=get_back_keyboard(user_id))
             await event.edit("⏳ **جاري فحص وتصفية الحسابات تلقائياً، يرجى الانتظار...**")
             alive, dead = 0, 0
             res = []
@@ -458,23 +472,23 @@ async def callback_handler(event):
                     dead += 1
                     delete_user_number(user_id, phone)
                     res.append(f"🗑️ `{phone}`: معطل وتم حذفه تلقائياً")
-            await event.edit(f"📊 **نتيجة فحص وتصفية الحسابات:**\n- الحسابات النشطة المتبقية: `{alive}`\n- الحسابات المعطلة (التي تم حذفها): `{dead}`\n\n" + "\n".join(res), buttons=get_back_keyboard())
+            await event.edit(f"📊 **نتيجة فحص وتصفية الحسابات:**\n- الحسابات النشطة المتبقية: `{alive}`\n- الحسابات المعطلة (التي تم حذفها): `{dead}`\n\n" + "\n".join(res), buttons=get_back_keyboard(user_id))
 
         elif data == "send_group_msg":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_group_msg"}
-            await event.edit("💬 **إرسال رسالة لمجموعة:**\nأرسل رابط المجموعة ثم نص الرسالة المطلوب إرسالها:", buttons=get_back_keyboard())
+            await event.edit("💬 **إرسال رسالة لمجموعة:**\nأرسل رابط المجموعة ثم نص الرسالة المطلوب إرسالها:", buttons=get_back_keyboard(user_id))
 
         elif data == "comment_post":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_comment"}
-            await event.edit("✍️ **تعليق على منشور:**\nأرسل رابط المنشور ثم نص التعليق المطلوب:", buttons=get_back_keyboard())
+            await event.edit("✍️ **تعليق على منشور:**\nأرسل رابط المنشور ثم نص التعليق المطلوب:", buttons=get_back_keyboard(user_id))
 
         elif data == "back_home":
             await event.answer()
             user_states.pop(user_id, None)
             is_admin = (user_id == ADMIN_ID)
-            await event.edit("👑 **القائمة الرئيسية للنظام:**", buttons=get_main_keyboard(is_admin))
+            await event.edit("👑 **القائمة الرئيسية للنظام:**", buttons=get_main_keyboard(user_id, is_admin))
             
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
@@ -739,4 +753,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

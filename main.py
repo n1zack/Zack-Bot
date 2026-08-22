@@ -372,7 +372,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة واستخراج الجلسات من ملفات .session المباشرة ---
+# --- معالجة واستخراج الجلسات من ملفات الأرشيف والـ .session (مع تفصيل الأخطاء ومسارات الملفات) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -391,20 +391,49 @@ async def handle_session_file(event):
             import shutil
             shutil.move(path, os.path.join(extract_dir, "file_direct"))
 
-        await event.respond("🔍 **جاري استخراج وتحويل جلسات SQLite وسحب الأرقام بدقة...**")
+        await event.respond("🔍 **جاري فحص الملفات، تحديد المسارات، واستخراج الجلسات بدقة...**")
         success_numbers = []
+        detailed_errors = []
 
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
                 f_path = os.path.join(root, file)
                 
-                # التركيز على ملفات الـ session أو الملفات التي بدون لاحقة
-                if file.endswith('.session') or '.' not in file:
+                # فحص ملفات الـ session أو الملفات النصية/بدون لاحقة
+                if file.endswith('.session') or '.' not in file or file.endswith('.txt'):
+                    file_phone_candidate = "".join([c for c in file if c.isdigit()])
+                    
+                    # محاولة قراءة المحتوى إذا كان ملف نصي يحتوي على StringSession مباشرة
+                    if file.endswith('.txt') or '.' not in file:
+                        try:
+                            with open(f_path, 'r', encoding='utf-8', errors='ignore') as tf:
+                                content = tf.read().strip()
+                                if len(content) > 20: # شبيه بـ StringSession
+                                    phone_str = None
+                                    try:
+                                        async with TelegramClient(StringSession(content), API_ID, API_HASH) as vc:
+                                            if await vc.is_user_authorized():
+                                                me = await vc.get_me()
+                                                if me and me.phone:
+                                                    phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
+                                    except:
+                                        pass
+                                    
+                                    if not phone_str and len(file_phone_candidate) >= 10:
+                                        phone_str = "+" + file_phone_candidate if not file_phone_candidate.startswith("+") else file_phone_candidate
+                                    
+                                    if phone_str:
+                                        add_user_number(user_id, phone_str, content)
+                                        if phone_str not in success_numbers:
+                                            success_numbers.append(phone_str)
+                                        continue
+                        except Exception as txt_ex:
+                            pass
+
+                    # معالجة ملفات SQLite (.session)
                     try:
                         conn_sql = sqlite3.connect(f_path)
                         cursor_sql = conn_sql.cursor()
-                        
-                        # قراءة بيانات الاتصال من جدول sessions
                         cursor_sql.execute("SELECT dc_id, server_address, port, auth_key FROM sessions LIMIT 1")
                         row = cursor_sql.fetchone()
                         conn_sql.close()
@@ -416,30 +445,49 @@ async def handle_session_file(event):
                             mem_session.auth_key = auth_key
                             session_str = mem_session.save()
                             
-                            # اختبار الجلسة واستخراج رقم الهاتف الحقيقي المرتبط بها
-                            async with TelegramClient(StringSession(session_str), API_ID, API_HASH) as vc:
-                                if await vc.is_user_authorized():
-                                    me = await vc.get_me()
-                                    if me and me.phone:
-                                        phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
-                                        add_user_number(user_id, phone_str, session_str)
-                                        if phone_str not in success_numbers:
-                                            success_numbers.append(phone_str)
+                            phone_str = None
+                            try:
+                                async with TelegramClient(StringSession(session_str), API_ID, API_HASH) as vc:
+                                    if await vc.is_user_authorized():
+                                        me = await vc.get_me()
+                                        if me and me.phone:
+                                            phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
+                            except Exception as api_err:
+                                detailed_errors.append(f"📁 المسار: `{f_path}`\n❌ خطأ اتصال تيليجرام: `{str(api_err)}`")
+
+                            if not phone_str and len(file_phone_candidate) >= 10:
+                                phone_str = "+" + file_phone_candidate if not file_phone_candidate.startswith("+") else file_phone_candidate
+
+                            if phone_str:
+                                add_user_number(user_id, phone_str, session_str)
+                                if phone_str not in success_numbers:
+                                    success_numbers.append(phone_str)
+                            else:
+                                detailed_errors.append(f"📁 المسار: `{f_path}`\n⚠️ تعذر استخراج رقم الهاتف (الجلسة قد تكون غير مسجلة الدخول أو فارغة).")
+                        else:
+                            detailed_errors.append(f"📁 المسار: `{f_path}`\n⚠️ جدول الجلسات فارغ (لا توجد بيانات `sessions` صحيحة).")
                     except Exception as ex:
-                        logger.error(f"Error parsing session file {file}: {ex}")
+                        detailed_errors.append(f"📁 المسار: `{f_path}`\n❌ خطأ في قراءة ملف SQLite: `{str(ex)}`")
 
         # تنظيف الملفات المؤقتة
         import shutil
         if os.path.exists(extract_dir): shutil.rmtree(extract_dir)
         if os.path.exists(path): os.remove(path)
 
+        # الرد بالنتيجة والتقرير التفصيلي للأخطاء إن وجدت
+        response_msg = ""
         if success_numbers:
-            await event.respond(f"✅ **تم بنجاح استخراج وحفظ ({len(success_numbers)}) رقماً في قاعدتك السحابية:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:20]]))
+            response_msg += f"✅ **تم بنجاح استخراج وحفظ ({len(success_numbers)}) رقماً في قاعدتك السحابية:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:15]]) + "\n\n"
         else:
-            await event.respond("⚠️ **لم يتم العثور على أرقام صالحة.** تأكد من أن ملفات الـ session مفعلة وغير منتهية الصلاحية.")
+            response_msg += "❌ **لم يتم العثور على أي أرقام صالحة بنجاح.**\n\n"
+
+        if detailed_errors:
+            response_msg += "📋 **تقرير مسارات الملفات وأسباب الفشل:**\n" + "\n\n".join(detailed_errors[:8])
+
+        await event.respond(response_msg)
     except Exception as e:
         logger.error(f"Error handling archive: {e}")
-        await event.respond(f"❌ حدث خطأ تقني أثناء معالجة الملف: {e}")
+        await event.respond(f"❌ حدث خطأ تقني عام أثناء معالجة الأرشيف: {e}")
 
 # --- معالجة الحالات والمدخلات النصية ---
 @client.on(events.NewMessage(incoming=True))
@@ -585,4 +633,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

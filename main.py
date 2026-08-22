@@ -52,6 +52,12 @@ def init_db():
                 expiry_date TEXT
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bot_users (
+                user_id BIGINT PRIMARY KEY,
+                first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
         cursor.close()
         conn.close()
@@ -60,6 +66,29 @@ def init_db():
         logger.error(f"Error initializing Neon database: {e}")
 
 init_db()
+
+def register_bot_user(user_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO bot_users (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING", (user_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except:
+        pass
+
+def get_total_bot_users():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM bot_users")
+        count = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        return count
+    except:
+        return 0
 
 def add_user_number(user_id, phone, session_string):
     conn = get_db_connection()
@@ -140,7 +169,7 @@ def get_subscribers():
 # --- واجهات وكيبوردات النظام ---
 def get_main_keyboard(is_admin=False):
     keyboard = [
-        [Button.inline("📱 أرقامي", "my_numbers"), Button.inline("➕ إضافة رقم", "add_number"), Button.inline("➖ حذف رقم", "delete_number")],
+        [Button.inline("📱 أرقامي", "my_numbers"), Button.inline("➕ إضافة رقم", "add_number"), Button.inline("➖ حذف رقم", "del_page_0")],
         [Button.inline("📥 تسجيل دخول (جلسات متعددة)", "session_login"), Button.inline("📤 تصدير الجلسات (ZIP)", "export_sessions")],
         [Button.inline("🤖 تشغيل بوت (إحالة / Mini App)", "ref_bot"), Button.inline("❤️ تفاعل رياكشن", "send_reaction")],
         [Button.inline("📢 انضمام لقناة/مجموعة", "join_chat"), Button.inline("🚪 مغادرة قناة/مجموعة", "leave_chat")],
@@ -200,6 +229,7 @@ client = TelegramClient('zack_bot_control_massive', API_ID, API_HASH)
 async def start(event):
     try:
         user_id = event.sender_id
+        register_bot_user(user_id)
         user_states.pop(user_id, None)
         is_admin = (user_id == ADMIN_ID)
         
@@ -228,7 +258,7 @@ async def callback_handler(event):
         data = event.data.decode('utf-8')
         user_id = event.sender_id
         
-        if data not in ["back_home", "admin_panel"] and user_id != ADMIN_ID and not is_subscribed(user_id):
+        if not data.startswith("del_page_") and not data.startswith("del_num_") and data not in ["back_home", "admin_panel"] and user_id != ADMIN_ID and not is_subscribed(user_id):
             await event.answer("⚠️ عذراً، اشتراكك غير مفعل في النظام!", alert=True)
             return
 
@@ -251,8 +281,11 @@ async def callback_handler(event):
             await event.edit(text, buttons=get_back_keyboard())
 
         elif data == "stats":
+            if user_id != ADMIN_ID: return
+            total_users = get_total_bot_users()
+            subs = get_subscribers()
             await event.answer()
-            await event.edit(f"📊 **إحصائيات النظام:**\n- معرف المستخدم: `{user_id}`\n- حالة الاتصال: مستقر ويعمل بكفاءة سحابياً عبر Neon ✅", buttons=get_back_keyboard())
+            await event.edit(f"📊 **إحصائيات النظام الشاملة:**\n- إجمالي الأشخاص الذين فتحوا البوت: `{total_users}` شخص\n- إجمالي المشتركين النشطين: `{len(subs)}` مشترك\n- حالة الاتصال: مستقر ويعمل بكفاءة سحابياً عبر Neon ✅", buttons=get_back_keyboard())
 
         elif data == "msg_user":
             if user_id != ADMIN_ID: return
@@ -277,10 +310,83 @@ async def callback_handler(event):
             user_states[user_id] = {"action": "waiting_for_phone"}
             await event.edit("➕ **إضافة رقم جديد:**\nأرسل رقم الهاتف بالصيغة الدولية الكاملة (مثال: `+961...`)", buttons=get_back_keyboard())
             
-        elif data == "delete_number":
+        elif data.startswith("del_page_"):
             await event.answer()
-            user_states[user_id] = {"action": "waiting_for_delete"}
-            await event.edit("➖ **حذف رقم:**\nأرسل الرقم المراد حذفه نهائياً من قائمتك:", buttons=get_back_keyboard())
+            page = int(data.split("_")[-1])
+            numbers = get_user_numbers(user_id)
+            
+            if not numbers:
+                await event.edit("⚠️ لا توجد أي أرقام مسجلة لحذفها.", buttons=get_back_keyboard())
+                return
+                
+            per_page = 6  # 3 صفوف × 2 أزرار بجانب بعض
+            total_pages = (len(numbers) + per_page - 1) // per_page
+            page = max(0, min(page, total_pages - 1))
+            
+            current_nums = numbers[page * per_page : (page + 1) * per_page]
+            
+            keyboard = []
+            row = []
+            for num in current_nums:
+                row.append(Button.inline(f"🗑️ حذف {num}", f"del_num_{page}_{num}"))
+                if len(row) == 2:
+                    keyboard.append(row)
+                    row = []
+            if row:
+                keyboard.append(row)
+                
+            nav_buttons = []
+            if page > 0:
+                nav_buttons.append(Button.inline("⬅️ السابق", f"del_page_{page - 1}"))
+            if page < total_pages - 1:
+                nav_buttons.append(Button.inline("التالي ➡️", f"del_page_{page + 1}"))
+            if nav_buttons:
+                keyboard.append(nav_buttons)
+                
+            keyboard.append([Button.inline("🔙 رجوع للقائمة الرئيسية", "back_home")])
+            
+            await event.edit(f"➖ **قائمة أرقامك (الصفحة {page + 1} من {total_pages}):**\nانقر على زر الرقم أدناه لحذفه فوراً:", buttons=keyboard)
+
+        elif data.startswith("del_num_"):
+            parts = data.split("_")
+            page = int(parts[2])
+            phone_to_delete = parts[3]
+            
+            delete_user_number(user_id, phone_to_delete)
+            await event.answer(f"✅ تم حذف الرقم {phone_to_delete} بنجاح!", alert=True)
+            
+            # إعادة توجيه لنفس نظام الصفحات المحدث
+            numbers = get_user_numbers(user_id)
+            if not numbers:
+                await event.edit("⚠️ لقد قمت بحذف كافة أرقامك. لم يتبق أي رقم مسجل.", buttons=get_back_keyboard())
+                return
+                
+            per_page = 6
+            total_pages = (len(numbers) + per_page - 1) // per_page
+            page = min(page, total_pages - 1)
+            current_nums = numbers[page * per_page : (page + 1) * per_page]
+            
+            keyboard = []
+            row = []
+            for num in current_nums:
+                row.append(Button.inline(f"🗑️ حذف {num}", f"del_num_{page}_{num}"))
+                if len(row) == 2:
+                    keyboard.append(row)
+                    row = []
+            if row:
+                keyboard.append(row)
+                
+            nav_buttons = []
+            if page > 0:
+                nav_buttons.append(Button.inline("⬅️ السابق", f"del_page_{page - 1}"))
+            if page < total_pages - 1:
+                nav_buttons.append(Button.inline("التالي ➡️", f"del_page_{page + 1}"))
+            if nav_buttons:
+                keyboard.append(nav_buttons)
+                
+            keyboard.append([Button.inline("🔙 رجوع للقائمة الرئيسية", "back_home")])
+            
+            await event.edit(f"➖ **قائمة أرقامك (الصفحة {page + 1} من {total_pages}):**\nانقر على زر الرقم أدناه لحذفه فوراً:", buttons=keyboard)
 
         elif data == "session_login":
             await event.answer()
@@ -490,7 +596,7 @@ async def handle_session_file(event):
         logger.error(f"Error handling archive: {e}")
         await event.respond(f"❌ حدث خطأ تقني عام أثناء معالجة الأرشيف: {e}")
 
-# --- معالجة الحالات والمدخلات النصية (مع التعديل السليم لمشكلة المجلدات والمشاهدات بدون حذف الحسابات النشطة) ---
+# --- معالجة الحالات والمدخلات النصية ---
 @client.on(events.NewMessage(incoming=True))
 async def handle_user_messages(event):
     if not event.is_private or event.raw_text.startswith('/'): return
@@ -522,7 +628,7 @@ async def handle_user_messages(event):
         elif action == "waiting_for_msg_all" and user_id == ADMIN_ID:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT user_id FROM user_numbers UNION SELECT DISTINCT user_id FROM subscribers")
+            cursor.execute("SELECT DISTINCT user_id FROM user_numbers UNION SELECT DISTINCT user_id FROM subscribers UNION SELECT DISTINCT user_id FROM bot_users")
             all_users = [row[0] for row in cursor.fetchall()]
             cursor.close()
             conn.close()
@@ -573,11 +679,6 @@ async def handle_user_messages(event):
             except Exception as ex:
                 await event.respond(f"❌ كلمة المرور غير صحيحة: {ex}")
 
-        elif action == "waiting_for_delete":
-            delete_user_number(user_id, text)
-            await event.respond(f"🗑️ **تم بنجاح حذف الرقم (`{text}`) من قاعدتك السحابية.**")
-            user_states.pop(user_id, None)
-
         elif action in ["waiting_for_ref", "waiting_for_join", "waiting_for_leave", "waiting_for_folder", "waiting_for_reaction", "waiting_for_view", "waiting_for_group_msg", "waiting_for_comment"]:
             parts = text.split(maxsplit=1)
             link = parts[0]
@@ -604,13 +705,11 @@ async def handle_user_messages(event):
                             p_l = link.split("/")
                             await acc(SendReactionRequest(peer=await acc.get_entity(p_l[-2]), msg_id=int(p_l[-1]), reaction=[ReactionEmoji(emoticon=extra)]))
                         elif action == "waiting_for_view":
-                            # التعديل الصحيح لزيادة المشاهدات عبر استدعاء GetMessagesViewsRequest لجلب وزيادة العداد رسمياً
                             p_l = link.split("/")
                             channel_entity = await acc.get_entity(p_l[-2])
                             msg_id = int(p_l[-1])
                             await acc(GetMessagesViewsRequest(peer=channel_entity, id=[msg_id], increment=True))
                         elif action == "waiting_for_folder":
-                            # التعديل الصحيح لفحص وقبول روابط المجلدات (addlist) بدون حذف الحسابات
                             slug = link.split("/")[-1].replace("addlist/", "").split("?")[0]
                             folder_info = await acc(CheckChatlistInviteRequest(slug=slug))
                             await acc(JoinChatlistInviteRequest(slug=slug, peers=folder_info.peers))
@@ -627,7 +726,6 @@ async def handle_user_messages(event):
             await event.respond(f"📊 **النتيجة النهائية للتنفيذ:**\n- ✅ نجحت على: `{succ}` حساب\n- ❌ فشلت على: `{fail}` حساب")
             user_states.pop(user_id, None)
     except Exception as ex:
-    
         logger.error(f"Error in user message handler: {ex}")
         await event.respond(f"❌ حدث خطأ غير متوقع أثناء معالجة طلبك: {ex}")
         user_states.pop(user_id, None)
@@ -641,3 +739,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+ 

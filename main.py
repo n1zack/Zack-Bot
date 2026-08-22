@@ -3,7 +3,7 @@ import logging
 import zipfile
 import asyncio
 import datetime
-import sqlite3
+import psycopg2
 import aiohttp
 from aiohttp import web
 from telethon import TelegramClient, events, Button
@@ -24,71 +24,87 @@ BOT_TOKEN = '8545427199:AAFr8eFKX6LUrGQCz9oRH14ASvzPYXLPJbs'
 API_ID = 31470691  
 API_HASH = '5c3f24ee62d7a7e46601a53f571f62cc'
 ADMIN_ID = 1251313339
+
+# رابط قاعدة البيانات السحابية (Supabase)
+SUPABASE_URL = "postgresql://postgres:Zack881881zZ@db.hyjlkcjuecurzbjrphca.supabase.co:5432/postgres"
 # ==========================================================
 
-# --- بناء وتهيئة قاعدة البيانات الداخلية الكاملة ---
+# --- بناء وتهيئة قاعدة البيانات السحابية (Supabase / PostgreSQL) ---
+def get_db_connection():
+    return psycopg2.connect(SUPABASE_URL)
+
 def init_db():
-    conn = sqlite3.connect('bot_database.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS user_numbers (
-            user_id INTEGER,
-            phone TEXT,
-            session_string TEXT
-        )
-    ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS subscribers (
-            user_id INTEGER PRIMARY KEY,
-            expiry_date TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_numbers (
+                user_id BIGINT,
+                phone TEXT,
+                session_string TEXT
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS subscribers (
+                user_id BIGINT PRIMARY KEY,
+                expiry_date TEXT
+            )
+        ''')
+        conn.commit()
+        cursor.close()
+        conn.close()
+        logger.info("Supabase database initialized successfully.")
+    except Exception as e:
+        logger.error(f"Error initializing Supabase database: {e}")
 
 init_db()
 
 def add_user_number(user_id, phone, session_string):
-    conn = sqlite3.connect('bot_database.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT session_string FROM user_numbers WHERE user_id = ? AND phone = ?", (user_id, phone))
+    cursor.execute("SELECT session_string FROM user_numbers WHERE user_id = %s AND phone = %s", (user_id, phone))
     if cursor.fetchone():
-        cursor.execute("UPDATE user_numbers SET session_string = ? WHERE user_id = ? AND phone = ?", (session_string, user_id, phone))
+        cursor.execute("UPDATE user_numbers SET session_string = %s WHERE user_id = %s AND phone = %s", (session_string, user_id, phone))
     else:
-        cursor.execute("INSERT INTO user_numbers (user_id, phone, session_string) VALUES (?, ?, ?)", (user_id, phone, session_string))
+        cursor.execute("INSERT INTO user_numbers (user_id, phone, session_string) VALUES (%s, %s, %s)", (user_id, phone, session_string))
     conn.commit()
+    cursor.close()
     conn.close()
 
 def get_user_numbers(user_id):
-    conn = sqlite3.connect('bot_database.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT phone FROM user_numbers WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT phone FROM user_numbers WHERE user_id = %s", (user_id,))
     rows = cursor.fetchall()
+    cursor.close()
     conn.close()
     return [row[0] for row in rows]
 
 def get_session_string(user_id, phone):
-    conn = sqlite3.connect('bot_database.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT session_string FROM user_numbers WHERE user_id = ? AND phone = ?", (user_id, phone))
+    cursor.execute("SELECT session_string FROM user_numbers WHERE user_id = %s AND phone = %s", (user_id, phone))
     row = cursor.fetchone()
+    cursor.close()
     conn.close()
     return row[0] if row else None
 
 def delete_user_number(user_id, phone):
-    conn = sqlite3.connect('bot_database.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM user_numbers WHERE user_id = ? AND phone = ?", (user_id, phone))
+    cursor.execute("DELETE FROM user_numbers WHERE user_id = %s AND phone = %s", (user_id, phone))
     conn.commit()
+    cursor.close()
     conn.close()
 
 def is_subscribed(user_id):
     if user_id == ADMIN_ID:
         return True
-    conn = sqlite3.connect('bot_database.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT expiry_date FROM subscribers WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT expiry_date FROM subscribers WHERE user_id = %s", (user_id,))
     row = cursor.fetchone()
+    cursor.close()
     conn.close()
     if row:
         expiry = datetime.datetime.strptime(row[0], "%Y-%m-%d")
@@ -99,18 +115,23 @@ def is_subscribed(user_id):
 def add_subscriber(user_id, days):
     expiry = datetime.datetime.now() + datetime.timedelta(days=days)
     expiry_str = expiry.strftime("%Y-%m-%d")
-    conn = sqlite3.connect('bot_database.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO subscribers (user_id, expiry_date) VALUES (?, ?)", (user_id, expiry_str))
+    cursor.execute(
+        "INSERT INTO subscribers (user_id, expiry_date) VALUES (%s, %s) ON CONFLICT (user_id) DO UPDATE SET expiry_date = EXCLUDED.expiry_date",
+        (user_id, expiry_str)
+    )
     conn.commit()
+    cursor.close()
     conn.close()
     return expiry_str
 
 def get_subscribers():
-    conn = sqlite3.connect('bot_database.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT user_id, expiry_date FROM subscribers")
     rows = cursor.fetchall()
+    cursor.close()
     conn.close()
     return rows
 
@@ -229,7 +250,7 @@ async def callback_handler(event):
 
         elif data == "stats":
             await event.answer()
-            await event.edit(f"📊 **إحصائيات النظام:**\n- معرف المستخدم: `{user_id}`\n- حالة الاتصال: مستقر ويعمل بكفاءة ✅", buttons=get_back_keyboard())
+            await event.edit(f"📊 **إحصائيات النظام:**\n- معرف المستخدم: `{user_id}`\n- حالة الاتصال: مستقر ويعمل بكفاءة وصحابياً عبر Supabase ✅", buttons=get_back_keyboard())
 
         elif data == "msg_user":
             if user_id != ADMIN_ID: return
@@ -246,7 +267,7 @@ async def callback_handler(event):
         elif data == "my_numbers":
             await event.answer()
             numbers = get_user_numbers(user_id)
-            text = f"📱 **أرقامك المسجلة في القاعدة:**\n\n" + ("\n".join([f"📱 `{n}`" for n in numbers]) if numbers else "لا توجد أرقام مسجلة لديك حالياً.")
+            text = f"📱 **أرقامك المسجلة في القاعدة السحابية:**\n\n" + ("\n".join([f"📱 `{n}`" for n in numbers]) if numbers else "لا توجد أرقام مسجلة لديك حالياً.")
             await event.edit(text, buttons=get_back_keyboard())
         
         elif data == "add_number":
@@ -261,7 +282,7 @@ async def callback_handler(event):
 
         elif data == "session_login":
             await event.answer()
-            await event.edit("📥 **رفع ملف الجلسات:**\nأرسل ملف الأرشيف بصيغة `zip` أو ملف نصي يحتوي على الجلسات وسأقوم بسحب الأرقام وحفظها فوراً:", buttons=get_back_keyboard())
+            await event.edit("📥 **رفع ملف الجلسات:**\nأرسل ملف الأرشيف بصيغة `zip` أو ملف نصي يحتوي على الجلسات وسأقوم بسحب الأرقام وحفظها سحابياً فوراً:", buttons=get_back_keyboard())
             
         elif data == "export_sessions":
             await event.answer()
@@ -349,7 +370,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة ملفات الأرشيف والجلسات بدقة كاملة ومطابقة تامة (المعدلة) ---
+# --- معالجة ملفات الأرشيف والجلسات بدقة كاملة ومطابقة تامة ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -368,7 +389,7 @@ async def handle_session_file(event):
             import shutil
             shutil.move(path, os.path.join(extract_dir, "file.zip"))
 
-        await event.respond("🔍 **جاري الفحص الشامل للأرشيف واستخراج كافة الجلسات والأرقام بدقة...**")
+        await event.respond("🔍 **جاري الفحص الشامل للأرشيف واستخراج كافة الجلسات والأرقام بدقة سحابية...**")
         success_numbers = []
 
         for root, dirs, files in os.walk(extract_dir):
@@ -407,7 +428,7 @@ async def handle_session_file(event):
         if os.path.exists(path): os.remove(path)
 
         if success_numbers:
-            await event.respond(f"✅ **تم بنجاح استخراج وحفظ ({len(success_numbers)}) رقماً في قاعدتك الخاصة:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:15]]))
+            await event.respond(f"✅ **تم بنجاح استخراج وحفظ ({len(success_numbers)}) رقماً في قاعدتك السحابية:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:15]]))
         else:
             await event.respond("⚠️ لم يتم العثور على أي جلسات صالحة تفويضياً داخل هذا الأرشيف المرسل. تأكد من أن الجلسات نشطة وغير محذورة.")
     except Exception as e:
@@ -428,7 +449,7 @@ async def handle_user_messages(event):
             parts = text.split()
             target_id, days = int(parts[1]), int(parts[2])
             expiry = add_subscriber(target_id, days)
-            await event.respond(f"✅ **تم تفعيل الاشتراك بنجاح:**\n- المستخدم: `{target_id}`\n- المدة: `{days}` أيام\n- تاريخ الانتهاء: `{expiry}`")
+            await event.respond(f"✅ **تم تفعيل الاشتراك بنجاح سحابياً:**\n- المستخدم: `{target_id}`\n- المدة: `{days}` أيام\n- تاريخ الانتهاء: `{expiry}`")
             try:
                 await client.send_message(target_id, f"🎉 **مبروك! تم تفعيل اشتراكك في البوت بنجاح.**\n⏳ تاريخ الانتهاء: `{expiry}`\nيمكنك استخدام كافة ميزات البوت بكامل الصلاحيات.")
             except:
@@ -444,10 +465,11 @@ async def handle_user_messages(event):
             user_states.pop(user_id, None)
 
         elif action == "waiting_for_msg_all" and user_id == ADMIN_ID:
-            conn = sqlite3.connect('bot_database.db')
+            conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT DISTINCT user_id FROM user_numbers UNION SELECT DISTINCT user_id FROM subscribers")
             all_users = [row[0] for row in cursor.fetchall()]
+            cursor.close()
             conn.close()
             success_cnt = 0
             await event.respond(f"⏳ **جاري إرسال الإذاعة العامة إلى (`{len(all_users)}`) مستخدم...**")
@@ -476,7 +498,7 @@ async def handle_user_messages(event):
                 s_str = st["tc"].session.save()
                 add_user_number(user_id, st["phone"], s_str)
                 await st["tc"].disconnect()
-                await event.respond("🎉 **تم تسجيل الدخول وحفظ الحساب في قاعدتك بنجاح تام!**")
+                await event.respond("🎉 **تم تسجيل الدخول وحفظ الحساب في قاعدتك السحابية بنجاح تام!**")
                 user_states.pop(user_id, None)
             except SessionPasswordNeededError:
                 user_states[user_id]["action"] = "waiting_for_password"
@@ -491,14 +513,14 @@ async def handle_user_messages(event):
                 s_str = st["tc"].session.save()
                 add_user_number(user_id, st["phone"], s_str)
                 await st["tc"].disconnect()
-                await event.respond("🎉 **تم تجاوز التحقق بخطوتين وحفظ الحساب بنجاح تام!**")
+                await event.respond("🎉 **تم تجاوز التحقق بخطوتين وحفظ الحساب سحابياً بنجاح تام!**")
                 user_states.pop(user_id, None)
             except Exception as ex:
                 await event.respond(f"❌ كلمة المرور غير صحيحة: {ex}")
 
         elif action == "waiting_for_delete":
             delete_user_number(user_id, text)
-            await event.respond(f"🗑️ **تم بنجاح حذف الرقم (`{text}`) من قاعدتك الخاصة.**")
+            await event.respond(f"🗑️ **تم بنجاح حذف الرقم (`{text}`) من قاعدتك السحابية.**")
             user_states.pop(user_id, None)
 
         elif action in ["waiting_for_ref", "waiting_for_join", "waiting_for_leave", "waiting_for_folder", "waiting_for_reaction", "waiting_for_view", "waiting_for_group_msg", "waiting_for_comment"]:
@@ -552,7 +574,7 @@ async def main():
     await start_web_server()
     asyncio.create_task(keep_alive())
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Massive Control Bot started successfully and running...")
+    logger.info("Massive Control Bot started successfully with Supabase and running...")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

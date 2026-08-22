@@ -9,7 +9,7 @@ import aiohttp
 from aiohttp import web
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession, MemorySession
-from telethon.errors import SessionPasswordNeededError
+from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.functions.messages import ImportChatInviteRequest, StartBotRequest, GetMessagesViewsRequest
 from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest
 from telethon.tl.functions.chatlists import JoinChatlistInviteRequest, CheckChatlistInviteRequest
@@ -396,7 +396,6 @@ async def callback_handler(event):
         data = event.data.decode('utf-8')
         user_id = event.sender_id
         
-        # زر تبديل اللغة مستثنى من قيود الاشتراك ليعمل بحرية دائماً
         if data == "switch_language":
             new_lang = toggle_user_lang(user_id)
             await event.answer(t(user_id, 'lang_changed'), alert=True)
@@ -602,7 +601,7 @@ async def callback_handler(event):
             for phone in nums:
                 s_str = get_session_string(user_id, phone)
                 try:
-                    async with TelegramClient(StringSession(s_str), API_ID, API_HASH) as acc:
+                    async with TelegramClient(StringSession(s_str), API_ID, API_HASH, timeout=10) as acc:
                         await acc.get_me()
                         alive += 1
                         res.append(f"✅ `{phone}`: Active & Working")
@@ -610,6 +609,7 @@ async def callback_handler(event):
                     dead += 1
                     delete_user_number(user_id, phone)
                     res.append(f"🗑️ `{phone}`: Dead & Deleted automatically")
+                await asyncio.sleep(0.5)
             await event.edit(f"📊 **Accounts Check Results:**\n- Active accounts remaining: `{alive}`\n- Dead accounts (deleted): `{dead}`\n\n" + "\n".join(res), buttons=get_back_keyboard(user_id))
 
         elif data == "send_group_msg":
@@ -668,7 +668,7 @@ async def handle_session_file(event):
                                 if len(content) > 20:
                                     phone_str = None
                                     try:
-                                        async with TelegramClient(StringSession(content), API_ID, API_HASH) as vc:
+                                        async with TelegramClient(StringSession(content), API_ID, API_HASH, timeout=10) as vc:
                                             if await vc.is_user_authorized():
                                                 me = await vc.get_me()
                                                 if me and me.phone:
@@ -709,7 +709,7 @@ async def handle_session_file(event):
 
                         if session_str:
                             try:
-                                async with TelegramClient(StringSession(session_str), API_ID, API_HASH) as test_c:
+                                async with TelegramClient(StringSession(session_str), API_ID, API_HASH, timeout=10) as test_c:
                                     if await test_c.is_user_authorized():
                                         me = await test_c.get_me()
                                         if me and me.phone:
@@ -748,7 +748,7 @@ async def handle_session_file(event):
         logger.error(f"Error handling archive: {e}")
         await event.respond(f"❌ General technical error processing archive: {e}")
 
-# --- معالجة الحالات والمدخلات النصية ---
+# --- معالجة الحالات والمدخلات النصية مع حماية ضد التجميد نهائياً ---
 @client.on(events.NewMessage(incoming=True))
 async def handle_user_messages(event):
     if not event.is_private or event.raw_text.startswith('/'): return
@@ -798,7 +798,7 @@ async def handle_user_messages(event):
             user_states.pop(user_id, None)
 
         elif action == "waiting_for_phone":
-            tc = TelegramClient(StringSession(), API_ID, API_HASH)
+            tc = TelegramClient(StringSession(), API_ID, API_HASH, timeout=10)
             await tc.connect()
             sent = await tc.send_code_request(text)
             user_states[user_id].update({"phone": text, "action": "waiting_for_code", "tc": tc, "hash": sent.phone_code_hash})
@@ -840,42 +840,65 @@ async def handle_user_messages(event):
             
             await event.respond(t(user_id, 'executing_process'))
             succ, fail = 0, 0
+            
             for phone in nums:
                 s_str = get_session_string(user_id, phone)
+                acc = None
                 try:
-                    async with TelegramClient(StringSession(s_str), API_ID, API_HASH) as acc:
-                        if action == "waiting_for_join":
-                            if "+" in link: await acc(ImportChatInviteRequest(link.split("/")[-1].replace("+", "")))
-                            else: await acc(JoinChannelRequest(link.split("/")[-1].replace("@", "")))
-                        elif action == "waiting_for_leave":
-                            await acc(LeaveChannelRequest(link.split("/")[-1].replace("@", "")))
-                        elif action == "waiting_for_ref":
-                            bot_u = link.split("/")[-1].split("?")[0].replace("@", "")
-                            param = link.split("start=")[1].split("&")[0] if "start=" in link else ""
-                            await acc(StartBotRequest(bot=bot_u, peer=bot_u, start_param=param))
-                        elif action == "waiting_for_reaction":
-                            p_l = link.split("/")
-                            await acc(SendReactionRequest(peer=await acc.get_entity(p_l[-2]), msg_id=int(p_l[-1]), reaction=[ReactionEmoji(emoticon=extra)]))
-                        elif action == "waiting_for_view":
-                            p_l = link.split("/")
-                            channel_entity = await acc.get_entity(p_l[-2])
-                            msg_id = int(p_l[-1])
-                            await acc(GetMessagesViewsRequest(peer=channel_entity, id=[msg_id], increment=True))
-                        elif action == "waiting_for_folder":
-                            slug = link.split("/")[-1].replace("addlist/", "").split("?")[0]
-                            folder_info = await acc(CheckChatlistInviteRequest(slug=slug))
-                            await acc(JoinChatlistInviteRequest(slug=slug, peers=folder_info.peers))
-                        elif action == "waiting_for_group_msg":
-                            await acc.send_message(link, extra)
-                        elif action == "waiting_for_comment":
-                            p_l = link.split("/")
-                            await acc.send_message(p_l[-2], extra, comment_to=int(p_l[-1]))
-                        succ += 1
+                    acc = TelegramClient(StringSession(s_str), API_ID, API_HASH, timeout=15)
+                    await acc.connect()
+                    
+                    if not await acc.is_user_authorized():
+                        fail += 1
+                        await acc.disconnect()
+                        continue
+
+                    if action == "waiting_for_join":
+                        if "+" in link: await acc(ImportChatInviteRequest(link.split("/")[-1].replace("+", "")))
+                        else: await acc(JoinChannelRequest(link.split("/")[-1].replace("@", "")))
+                    elif action == "waiting_for_leave":
+                        await acc(LeaveChannelRequest(link.split("/")[-1].replace("@", "")))
+                    elif action == "waiting_for_ref":
+                        bot_u = link.split("/")[-1].split("?")[0].replace("@", "")
+                        param = link.split("start=")[1].split("&")[0] if "start=" in link else ""
+                        await acc(StartBotRequest(bot=bot_u, peer=bot_u, start_param=param))
+                    elif action == "waiting_for_reaction":
+                        p_l = link.split("/")
+                        channel_entity = await acc.get_entity(p_l[-2])
+                        await acc(SendReactionRequest(peer=channel_entity, msg_id=int(p_l[-1]), reaction=[ReactionEmoji(emoticon=extra)]))
+                    elif action == "waiting_for_view":
+                        p_l = link.split("/")
+                        channel_entity = await acc.get_entity(p_l[-2])
+                        msg_id = int(p_l[-1])
+                        await acc(GetMessagesViewsRequest(peer=channel_entity, id=[msg_id], increment=True))
+                    elif action == "waiting_for_folder":
+                        slug = link.split("/")[-1].replace("addlist/", "").split("?")[0]
+                        folder_info = await acc(CheckChatlistInviteRequest(slug=slug))
+                        await acc(JoinChatlistInviteRequest(slug=slug, peers=folder_info.peers))
+                    elif action == "waiting_for_group_msg":
+                        await acc.send_message(link, extra)
+                    elif action == "waiting_for_comment":
+                        p_l = link.split("/")
+                        await acc.send_message(p_l[-2], extra, comment_to=int(p_l[-1]))
+                    
+                    succ += 1
+                except FloodWaitError as fwe:
+                    logger.warning(f"FloodWait on {phone}: {fwe.seconds}s")
+                    fail += 1
                 except Exception as ex:
                     logger.error(f"Execution error on {phone}: {ex}")
                     fail += 1
+                finally:
+                    if acc and acc.is_connected():
+                        try:
+                            await acc.disconnect()
+                        except:
+                            pass
+                
+                # فاصل زمني آمن لضمان استقرار السيرفر ومنع التعليق
+                await asyncio.sleep(1.5)
                     
-            await event.respond(f"📊 **Final Execution Results:**\n- ✅ Successful on: `{succ}` accounts\n- ❌ Failed on: `{fail}` accounts")
+            await event.respond(f"📊 **Final Execution Results:**\n- ✅ Successful on: `{succ}` accounts\n- ❌ Failed/Timed out on: `{fail}` accounts")
             user_states.pop(user_id, None)
     except Exception as ex:
         logger.error(f"Error in user message handler: {ex}")

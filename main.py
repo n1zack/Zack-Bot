@@ -372,7 +372,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة وتحليل ملفات الأرشيف مع طباعة المسارات والأنواع ---
+# --- معالجة واستخراج الجلسات من ملفات .session المباشرة ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -391,73 +391,55 @@ async def handle_session_file(event):
             import shutil
             shutil.move(path, os.path.join(extract_dir, "file_direct"))
 
-        await event.respond("🔬 **جاري فحص بنية الأرشيف وتحليل الملفات الموجودة...**")
-        
-        found_files = []
+        await event.respond("🔍 **جاري استخراج وتحويل جلسات SQLite وسحب الأرقام بدقة...**")
         success_numbers = []
 
-        # جمع وطباعة كافة مسارات الملفات للتحليل
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
                 f_path = os.path.join(root, file)
-                rel_path = os.path.relpath(f_path, extract_dir)
-                file_size = os.path.getsize(f_path)
-                found_files.append(f"📁 `{rel_path}` (الحجم: {file_size} بايت)")
-
-                session_str = ""
-                if file.startswith('.') or file.lower() == 'readme.txt':
-                    continue
-
-                try:
-                    # محاولة قراءة ملفات السشن أو SQLite
-                    if file.endswith('.session') or file.endswith('.sqlite') or '.' not in file:
-                        try:
-                            conn_sql = sqlite3.connect(f_path)
-                            cursor_sql = conn_sql.cursor()
-                            cursor_sql.execute("SELECT dc_id, server_address, port, auth_key FROM sessions LIMIT 1")
-                            row = cursor_sql.fetchone()
-                            conn_sql.close()
+                
+                # التركيز على ملفات الـ session أو الملفات التي بدون لاحقة
+                if file.endswith('.session') or '.' not in file:
+                    try:
+                        conn_sql = sqlite3.connect(f_path)
+                        cursor_sql = conn_sql.cursor()
+                        
+                        # قراءة بيانات الاتصال من جدول sessions
+                        cursor_sql.execute("SELECT dc_id, server_address, port, auth_key FROM sessions LIMIT 1")
+                        row = cursor_sql.fetchone()
+                        conn_sql.close()
+                        
+                        if row:
+                            dc_id, server_address, port, auth_key = row
+                            mem_session = MemorySession()
+                            mem_session.set_dc(dc_id, server_address, port)
+                            mem_session.auth_key = auth_key
+                            session_str = mem_session.save()
                             
-                            if row:
-                                dc_id, server_address, port, auth_key = row
-                                mem_session = MemorySession()
-                                mem_session.set_dc(dc_id, server_address, port)
-                                mem_session.auth_key = auth_key
-                                session_str = mem_session.save()
-                        except Exception as sqlex:
-                            logger.error(f"SQLite error on {file}: {sqlex}")
-                    
-                    # محاولة قراءة الملفات النصية
-                    if not session_str and (file.endswith('.txt') or file.endswith('.json')):
-                        with open(f_path, "r", encoding="utf-8", errors="ignore") as rf:
-                            content = rf.read().strip()
-                            if len(content) > 10:
-                                session_str = content
+                            # اختبار الجلسة واستخراج رقم الهاتف الحقيقي المرتبط بها
+                            async with TelegramClient(StringSession(session_str), API_ID, API_HASH) as vc:
+                                if await vc.is_user_authorized():
+                                    me = await vc.get_me()
+                                    if me and me.phone:
+                                        phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
+                                        add_user_number(user_id, phone_str, session_str)
+                                        if phone_str not in success_numbers:
+                                            success_numbers.append(phone_str)
+                    except Exception as ex:
+                        logger.error(f"Error parsing session file {file}: {ex}")
 
-                    # التحقق من الجلسة وحفظ الرقم
-                    if session_str:
-                        async with TelegramClient(StringSession(session_str), API_ID, API_HASH) as vc:
-                            if await vc.is_user_authorized():
-                                me = await vc.get_me()
-                                if me and me.phone:
-                                    phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
-                                    add_user_number(user_id, phone_str, session_str)
-                                    if phone_str not in success_numbers:
-                                        success_numbers.append(phone_str)
-                except Exception as ex:
-                    logger.error(f"Error parsing {file}: {ex}")
-
-        # تنظيف
+        # تنظيف الملفات المؤقتة
         import shutil
         if os.path.exists(extract_dir): shutil.rmtree(extract_dir)
         if os.path.exists(path): os.remove(path)
 
-        # إرسال تقرير التحليل للمستخدم
-        report_files = "\n".join(found_files[:20]) if found_files else "لا توجد ملفات داخل الأرشيف."
-        await event.respond(f"📊 **تقرير تحليل محتوى الأرشيف:**\n{report_files}\n\n" + (f"✅ **تم بنجاح حفظ ({len(success_numbers)}) رقماً!**" if success_numbers else "❌ **النتيجة:** لم يتم استخراج أي رقم، يرجى فحص مسارات الملفات أعلاه لمعرفة الصيغة."))
+        if success_numbers:
+            await event.respond(f"✅ **تم بنجاح استخراج وحفظ ({len(success_numbers)}) رقماً في قاعدتك السحابية:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:20]]))
+        else:
+            await event.respond("⚠️ **لم يتم العثور على أرقام صالحة.** تأكد من أن ملفات الـ session مفعلة وغير منتهية الصلاحية.")
     except Exception as e:
         logger.error(f"Error handling archive: {e}")
-        await event.respond(f"❌ حدث خطأ تقني: {e}")
+        await event.respond(f"❌ حدث خطأ تقني أثناء معالجة الملف: {e}")
 
 # --- معالجة الحالات والمدخلات النصية ---
 @client.on(events.NewMessage(incoming=True))

@@ -283,7 +283,7 @@ async def callback_handler(event):
 
         elif data == "session_login":
             await event.answer()
-            await event.edit("📥 **رفع ملف الجلسات:**\nأرسل ملف الأرشيف بصيغة `zip` أو ملف نصي يحتوي على الجلسات وسأقوم بسحب الأرقام وحفظها سحابياً فوراً:", buttons=get_back_keyboard())
+            await event.edit("📥 **رفع ملف الجلسات:**\nأرسل ملف الأرشيف بصيغة `zip` أو ملف نصي يحتوي على الجلسات أو ملفات `.session` وسأقوم بسحب الأرقام وحفظها سحابياً فوراً:", buttons=get_back_keyboard())
             
         elif data == "export_sessions":
             await event.answer()
@@ -371,7 +371,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة ملفات الأرشيف والجلسات ---
+# --- معالجة ملفات الأرشيف والجلسات (المحدثة لتقرأ كل الأنواع تلقائياً) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -388,28 +388,39 @@ async def handle_session_file(event):
                 zip_ref.extractall(extract_dir)
         except:
             import shutil
-            shutil.move(path, os.path.join(extract_dir, "file.zip"))
+            shutil.move(path, os.path.join(extract_dir, "file_direct"))
 
         await event.respond("🔍 **جاري الفحص الشامل للأرشيف واستخراج كافة الجلسات والأرقام بدقة سحابية...**")
         success_numbers = []
 
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
+                # تجاهل الملفات الغير صالحة مثل README وملفات المعلومات التابعة للبوتات الأخرى
+                if file.startswith('info_') or file.lower() == 'readme.txt':
+                    continue
+                    
                 f_path = os.path.join(root, file)
                 session_str = ""
                 try:
+                    # 1. إذا كان ملف قاعدة بيانات .session (صادر من بوت خارجي)
                     if file.endswith('.session'):
-                        tc = TelegramClient(f_path, API_ID, API_HASH)
-                        await tc.connect()
-                        if await tc.is_user_authorized():
-                            session_str = tc.session.save()
-                        await tc.disconnect()
-                    elif (file.endswith('.txt') or '.' not in file) and not file.startswith('info_'):
+                        try:
+                            tc = TelegramClient(f_path, API_ID, API_HASH)
+                            await tc.connect()
+                            if await tc.is_user_authorized():
+                                session_str = tc.session.save()
+                            await tc.disconnect()
+                        except Exception as inner_ex:
+                            logger.error(f"Error reading session database {file}: {inner_ex}")
+                    
+                    # 2. إذا كان ملف نصي أو ملف مباشر يحوي StringSession (صادر من بوتك أو بصيغة نصية)
+                    elif file.endswith('.txt') or '.' not in file:
                         with open(f_path, "r", encoding="utf-8", errors="ignore") as rf:
                             content = rf.read().strip()
                             if len(content) > 20:
                                 session_str = content
 
+                    # التحقق من صلاحية الجلسة المستخرجة وحفظها في القاعدة
                     if session_str:
                         vc = TelegramClient(StringSession(session_str), API_ID, API_HASH)
                         await vc.connect()
@@ -422,7 +433,7 @@ async def handle_session_file(event):
                                     success_numbers.append(phone_str)
                         await vc.disconnect()
                 except Exception as ex:
-                    logger.error(f"Error parsing session file {file}: {ex}")
+                    logger.error(f"Error parsing file {file}: {ex}")
 
         import shutil
         if os.path.exists(extract_dir): shutil.rmtree(extract_dir)

@@ -16,9 +16,6 @@ from telethon.tl.functions.chatlists import JoinChatlistInviteRequest, CheckChat
 from telethon.tl.functions.messages import SendReactionRequest
 from telethon.tl.types import ReactionEmoji
 
-# استدعاء دوال ملف الترجمات الخارجي
-from langs import t, toggle_user_lang, get_user_lang
-
 # إعدادات التسجيل الشاملة
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,6 +30,113 @@ ADMIN_ID = 1251313339
 SUPABASE_URL = "postgresql://neondb_owner:npg_3AlBEIVMT0on@ep-lively-bonus-axwosu8s.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
 # ==========================================================
+
+# --- نظام اللغات والترجمات (Languages & Translations) ---
+TRANSLATIONS = {
+    'ar': {
+        'admin_welcome': "👑 **مرحباً بك مجدداً يا زاك (المشرف العام)**\nمعرفك الشخصي (ID): `{user_id}`\n\nاختر العملية المطلوبة من القائمة أدناه:",
+        'user_welcome': "👋 **مرحباً بك {user_name}**\nمعرفك الشخصي (ID): `{user_id}`\n\nاختر العملية المطلوبة من القائمة أدناه:",
+        'not_subscribed': "⚠️ **أنت غير مشترك في البوت.**\nمعرفك (ID): `{user_id}`\nقم بالتواصل مع @n1zack لتفعيل اشتراكك.",
+        'unauthorized_action': "⚠️ عذراً، اشتراكك غير مفعل في النظام!",
+        
+        # الأزرار الرئيسية
+        'btn_my_numbers': "📱 أرقامي",
+        'btn_add_number': "➕ إضافة رقم",
+        'btn_del_number': "➖ حذف رقم",
+        'btn_session_login': "📥 تسجيل دخول (جلسات متعددة)",
+        'btn_export_sessions': "📤 تصدير الجلسات (ZIP)",
+        'btn_ref_bot': "🤖 تشغيل بوت (إحالة / Mini App)",
+        'btn_reaction': "❤️ تفاعل رياكشن",
+        'btn_join_chat': "📢 انضمام لقناة/مجموعة",
+        'btn_leave_chat': "🚪 مغادرة قناة/مجموعة",
+        'btn_join_folder': "📁 انضمام لمجلد",
+        'btn_view_post': "👀 زيادة مشاهدات",
+        'btn_check_accounts': "🔄 فحص وتنظيف الحسابات",
+        'btn_group_msg': "💬 رسالة للمجموعة",
+        'btn_comment_post': "✍️ تعليق على منشور",
+        'btn_admin_panel': "⚙️ لوحة التحكم",
+        'btn_lang_switch': "🌐 English",
+        
+        # أزرار الإرجاع والتحكم
+        'btn_back': "🔙 رجوع للقائمة الرئيسية",
+        'btn_next': "التالي ➡️",
+        'btn_prev': "⬅️ السابق",
+        
+        # لوحة المشرف والرسائل
+        'admin_title': "⚙️ **لوحة تحكم المشرف العام:**\nاختر الإجراء المناسب:",
+        'btn_sub_user': "✅ تفعيل اشتراك (ID)",
+        'btn_list_subs': "👥 قائمة المشتركين",
+        'btn_stats': "📊 إحصائيات",
+        'btn_msg_user': "✉️ رسالة لمستخدم",
+        'btn_msg_all': "📢 رسالة للكل",
+        
+        # رسائل الردود
+        'lang_changed': "✅ تم تغيير اللغة بنجاح إلى الإنجليزية!",
+        'no_numbers': "⚠️ لا توجد أرقام مسجلة لديك حالياً.",
+        'my_numbers_title': "📱 **أرقامك المسجلة في القاعدة السحابية:**\n\n",
+        'add_phone_prompt': "➕ **إضافة رقم جديد:**\nأرسل رقم الهاتف بالصيغة الدولية الكاملة (مثال: `+961...`)",
+        'main_menu_title': "👑 **القائمة الرئيسية للنظام:**",
+    },
+    'en': {
+        'admin_welcome': "👑 **Welcome back Zack (Super Admin)**\nYour ID: `{user_id}`\n\nChoose the required operation from the menu below:",
+        'user_welcome': "👋 **Welcome {user_name}**\nYour ID: `{user_id}`\n\nChoose the required operation from the menu below:",
+        'not_subscribed': "⚠️ **You are not subscribed to the bot.**\nYour ID: `{user_id}`\nPlease contact @n1zack to activate your subscription.",
+        'unauthorized_action': "⚠️ Sorry, your subscription is not active in the system!",
+        
+        # Main Buttons
+        'btn_my_numbers': "📱 My Numbers",
+        'btn_add_number': "➕ Add Number",
+        'btn_del_number': "➖ Delete Number",
+        'btn_session_login': "📥 Session Login",
+        'btn_export_sessions': "📤 Export Sessions (ZIP)",
+        'btn_ref_bot': "🤖 Run Ref/Mini App Bot",
+        'btn_reaction': "❤️ Send Reaction",
+        'btn_join_chat': "📢 Join Chat",
+        'btn_leave_chat': "🚪 Leave Chat",
+        'btn_join_folder': "📁 Join Folder",
+        'btn_view_post': "👀 View Post",
+        'btn_check_accounts': "🔄 Check & Clean Accounts",
+        'btn_group_msg': "💬 Group Message",
+        'btn_comment_post': "✍️ Comment on Post",
+        'btn_admin_panel': "⚙️ Admin Panel",
+        'btn_lang_switch': "🌐 العربية",
+        
+        # Back & Navigation
+        'btn_back': "🔙 Back to Main Menu",
+        'btn_next': "Next ➡️",
+        'btn_prev': "⬅️ Previous",
+        
+        # Admin Panel & Messages
+        'admin_title': "⚙️ **Super Admin Control Panel:**\nChoose an appropriate action:",
+        'btn_sub_user': "✅ Activate Subscription (ID)",
+        'btn_list_subs': "👥 Subscribers List",
+        'btn_stats': "📊 Statistics",
+        'btn_msg_user': "✉️ Message User",
+        'btn_msg_all': "📢 Broadcast to All",
+        
+        # Response Messages
+        'lang_changed': "✅ Language changed successfully to Arabic!",
+        'no_numbers': "⚠️ You have no numbers registered currently.",
+        'my_numbers_title': "📱 **Your registered numbers in cloud database:**\n\n",
+        'add_phone_prompt': "➕ **Add new number:**\nSend the phone number in full international format (e.g., `+961...`)",
+        'main_menu_title': "👑 **Main System Menu:**",
+    }
+}
+
+user_languages = {}
+
+def get_user_lang(user_id):
+    return user_languages.get(user_id, 'ar')
+
+def toggle_user_lang(user_id):
+    current = get_user_lang(user_id)
+    new_lang = 'en' if current == 'ar' else 'ar'
+    user_languages[user_id] = new_lang
+    return new_lang
+
+def t(user_id, key):
+    lang = get_user_lang(user_id)
+    return TRANSLATIONS.get(lang, TRANSLATIONS['ar']).get(key, key)
 
 # --- بناء وتهيئة قاعدة البيانات السحابية (Neon / PostgreSQL) ---
 def get_db_connection():
@@ -169,7 +273,7 @@ def get_subscribers():
     conn.close()
     return rows
 
-# --- واجهات وكيبوردات النظام المحدثة مع دعم اللغات ---
+# --- واجهات وكيبوردات النظام الديناميكية حسب لغة المستخدم ---
 def get_main_keyboard(user_id, is_admin=False):
     keyboard = [
         [Button.inline(t(user_id, 'btn_my_numbers'), "my_numbers"), Button.inline(t(user_id, 'btn_add_number'), "add_number"), Button.inline(t(user_id, 'btn_del_number'), "del_page_0")],
@@ -241,8 +345,10 @@ async def start(event):
         user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
         
         if not is_admin and not is_subscribed(user_id):
-            not_sub_text = t(user_id, 'not_subscribed').format(user_id=user_id)
-            await event.respond(not_sub_text, buttons=get_back_keyboard(user_id))
+            await event.respond(
+                t(user_id, 'not_subscribed').format(user_id=user_id),
+                buttons=get_back_keyboard(user_id)
+            )
             return
 
         if is_admin:
@@ -260,9 +366,10 @@ async def callback_handler(event):
         data = event.data.decode('utf-8')
         user_id = event.sender_id
         
+        # زر تبديل اللغة مستثنى من قيود الاشتراك ليعمل بحرية دائماً
         if data == "switch_language":
             toggle_user_lang(user_id)
-            await event.answer("✅ تم تغيير اللغة بنجاح!", alert=True)
+            await event.answer(t(user_id, 'lang_changed'), alert=True)
             is_admin = (user_id == ADMIN_ID)
             sender = await event.get_sender()
             user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
@@ -274,7 +381,7 @@ async def callback_handler(event):
             return
 
         if not data.startswith("del_page_") and not data.startswith("del_num_") and data not in ["back_home", "admin_panel"] and user_id != ADMIN_ID and not is_subscribed(user_id):
-            await event.answer("⚠️ عذراً، اشتراكك غير مفعل في النظام!", alert=True)
+            await event.answer(t(user_id, 'unauthorized_action'), alert=True)
             return
 
         if data == "admin_panel":
@@ -317,13 +424,13 @@ async def callback_handler(event):
         elif data == "my_numbers":
             await event.answer()
             numbers = get_user_numbers(user_id)
-            text = f"📱 **أرقامك المسجلة في القاعدة السحابية:**\n\n" + ("\n".join([f"📱 `{n}`" for n in numbers]) if numbers else "لا توجد أرقام مسجلة لديك حالياً.")
+            text = t(user_id, 'my_numbers_title') + ("\n".join([f"📱 `{n}`" for n in numbers]) if numbers else t(user_id, 'no_numbers'))
             await event.edit(text, buttons=get_back_keyboard(user_id))
         
         elif data == "add_number":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_phone"}
-            await event.edit("➕ **إضافة رقم جديد:**\nأرسل رقم الهاتف بالصيغة الدولية الكاملة (مثال: `+961...`)", buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'add_phone_prompt'), buttons=get_back_keyboard(user_id))
             
         elif data.startswith("del_page_"):
             await event.answer()
@@ -334,7 +441,7 @@ async def callback_handler(event):
                 await event.edit("⚠️ لا توجد أي أرقام مسجلة لحذفها.", buttons=get_back_keyboard(user_id))
                 return
                 
-            per_page = 6  
+            per_page = 6  # 3 صفوف × 2 أزرار بجانب بعض
             total_pages = (len(numbers) + per_page - 1) // per_page
             page = max(0, min(page, total_pages - 1))
             
@@ -488,7 +595,7 @@ async def callback_handler(event):
             await event.answer()
             user_states.pop(user_id, None)
             is_admin = (user_id == ADMIN_ID)
-            await event.edit("👑 **القائمة الرئيسية للنظام:**", buttons=get_main_keyboard(user_id, is_admin))
+            await event.edit(t(user_id, 'main_menu_title'), buttons=get_main_keyboard(user_id, is_admin))
             
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")

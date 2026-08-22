@@ -38,12 +38,12 @@ TRANSLATIONS = {
         'user_welcome': "👋 **مرحباً بك {user_name}**\nمعرفك الشخصي (ID): `{user_id}`\n\nاختر العملية المطلوبة من القائمة أدناه:",
         'not_subscribed': """#️⃣ English :
 ⚠️ You are not subscribed to the bot.
-Your ID \n (ID): `{user_id}`\n
+Your ID: `{user_id}`
 Contact @n1zack to activate your subscription.
 _____________________
 #️⃣ العربية :
 ⚠️ أنت غير مشترك في البوت.
-معرفك \n (ID): `{user_id}`\n 
+معرفك (ID): `{user_id}`
 قم بالتواصل مع @n1zack لتفعيل اشتراكك.""",
         'unauthorized_action': "⚠️ عذراً، اشتراكك غير مفعل في النظام!",
         
@@ -103,7 +103,15 @@ _____________________
     'en': {
         'admin_welcome': "👑 **Welcome back Zack (Super Admin)**\nYour ID: `{user_id}`\n\nChoose the required operation from the menu below:",
         'user_welcome': "👋 **Welcome {user_name}**\nYour ID: `{user_id}`\n\nChoose the required operation from the menu below:",
-        'not_subscribed': "⚠️ **You are not subscribed to the bot.**\nYour ID: `{user_id}`\nPlease contact @n1zack to activate your subscription.",
+        'not_subscribed': """#️⃣ English :
+⚠️ You are not subscribed to the bot.
+Your ID: `{user_id}`
+Contact @n1zack to activate your subscription.
+_____________________
+#️⃣ العربية :
+⚠️ أنت غير مشترك في البوت.
+معرفك (ID): `{user_id}`
+قم بالتواصل مع @n1zack لتفعيل اشتراكك.""",
         'unauthorized_action': "⚠️ Sorry, your subscription is not active in the system!",
         
         # Main Buttons
@@ -375,13 +383,14 @@ client = TelegramClient('zack_bot_control_massive', API_ID, API_HASH)
 async def start(event):
     try:
         user_id = event.sender_id
-        register_bot_user(user_id)
+        register_bot_user(user_id)  # تسجيل المستخدم في قاعدة البيانات أولاً بأول
         user_states.pop(user_id, None)
         is_admin = (user_id == ADMIN_ID)
         
         sender = await event.get_sender()
         user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
         
+        # التحقق من الاشتراك للمستخدمين العاديين
         if not is_admin and not is_subscribed(user_id):
             await event.respond(
                 t(user_id, 'not_subscribed').format(user_id=user_id),
@@ -408,6 +417,15 @@ async def callback_handler(event):
             new_lang = toggle_user_lang(user_id)
             await event.answer(t(user_id, 'lang_changed'), alert=True)
             is_admin = (user_id == ADMIN_ID)
+            
+            # إذا كان المستخدم غير مشترك، قم بتحديث رسالة عدم الاشتراك باللغة الجديدة
+            if not is_admin and not is_subscribed(user_id):
+                await event.edit(
+                    t(user_id, 'not_subscribed').format(user_id=user_id),
+                    buttons=get_back_keyboard(user_id)
+                )
+                return
+
             sender = await event.get_sender()
             user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
             if is_admin:
@@ -634,6 +652,14 @@ async def callback_handler(event):
             await event.answer()
             user_states.pop(user_id, None)
             is_admin = (user_id == ADMIN_ID)
+            
+            if not is_admin and not is_subscribed(user_id):
+                await event.edit(
+                    t(user_id, 'not_subscribed').format(user_id=user_id),
+                    buttons=get_back_keyboard(user_id)
+                )
+                return
+
             await event.edit(t(user_id, 'main_menu_title'), buttons=get_main_keyboard(user_id, is_admin))
             
     except Exception as e:
@@ -645,7 +671,7 @@ async def handle_session_file(event):
     try:
         user_id = event.sender_id
         if user_id != ADMIN_ID and not is_subscribed(user_id):
-            return await event.respond("⚠️ Sorry, you are not subscribed to use this feature.")
+            return
 
         path = await event.download_media()
         extract_dir = f"extracted_full_{user_id}"
@@ -761,6 +787,11 @@ async def handle_session_file(event):
 async def handle_user_messages(event):
     if not event.is_private or event.raw_text.startswith('/'): return
     user_id = event.sender_id
+    
+    # منع المستخدمين غير المشتركين من إرسال أوامر نصية عشوائية تتسبب في مشاكل
+    if user_id != ADMIN_ID and not is_subscribed(user_id):
+        return
+
     text = event.raw_text.strip()
     if user_id not in user_states: return
 
@@ -903,7 +934,6 @@ async def handle_user_messages(event):
                         except:
                             pass
                 
-                # فاصل زمني آمن لضمان استقرار السيرفر ومنع التعليق
                 await asyncio.sleep(1.5)
                     
             await event.respond(f"📊 **Final Execution Results:**\n- ✅ Successful on: `{succ}` accounts\n- ❌ Failed/Timed out on: `{fail}` accounts")
@@ -922,4 +952,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

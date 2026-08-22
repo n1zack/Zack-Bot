@@ -4,10 +4,11 @@ import zipfile
 import asyncio
 import datetime
 import psycopg2
+import sqlite3
 import aiohttp
 from aiohttp import web
 from telethon import TelegramClient, events, Button
-from telethon.sessions import StringSession
+from telethon.sessions import StringSession, MemorySession
 from telethon.errors import SessionPasswordNeededError
 from telethon.tl.functions.messages import ImportChatInviteRequest, StartBotRequest
 from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest
@@ -371,7 +372,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة ملفات الأرشيف والجلسات (المحدثة خصيصاً لقراءة ملفات SQLite .session الخارجية بدقة) ---
+# --- معالجة ملفات الأرشيف والجلسات (المحدثة خصيصاً لقراءة ملفات SQLite .session الخارجية بدقة متناهية) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -386,33 +387,39 @@ async def handle_session_file(event):
         try:
             with zipfile.ZipFile(path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
-        except Exception as e:
-            logger.error(f"Error unzipping file: {e}")
+        except Exception:
             import shutil
             shutil.move(path, os.path.join(extract_dir, "file_direct"))
 
-        await event.respond("🔍 **جاري فحص وقراءة ملفات الـ SQLite Session واستخراج الجلسات بدقة...**")
+        await event.respond("🔍 **جاري قراءة محتوى ملفات الجلسات واستخراج البيانات برمجياً بدقة فائقة...**")
         success_numbers = []
 
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
-                # تجاهل الملفات الغير صالحة مثل README وملفات المعلومات التابعة للبوتات الأخرى
                 if file.startswith('info_') or file.lower() == 'readme.txt' or file.startswith('.'):
                     continue
                     
                 f_path = os.path.join(root, file)
                 session_str = ""
                 try:
-                    # 1. إذا كان ملف قاعدة بيانات .session (صادر من بوت خارجي)
+                    # قراءة ملفات SQLite .session واستخراج StringSession منها يدوياً وبرمجياً
                     if file.endswith('.session'):
                         try:
-                            async with TelegramClient(f_path, API_ID, API_HASH) as temp_client:
-                                if await temp_client.is_user_authorized():
-                                    session_str = temp_client.session.save()
-                        except Exception as inner_ex:
-                            logger.error(f"Error opening session file {file}: {inner_ex}")
+                            conn_sql = sqlite3.connect(f_path)
+                            cursor_sql = conn_sql.cursor()
+                            cursor_sql.execute("SELECT dc_id, server_address, port, auth_key FROM sessions LIMIT 1")
+                            row = cursor_sql.fetchone()
+                            conn_sql.close()
+                            
+                            if row:
+                                dc_id, server_address, port, auth_key = row
+                                mem_session = MemorySession()
+                                mem_session.set_dc(dc_id, server_address, port)
+                                mem_session.auth_key = auth_key
+                                session_str = mem_session.save()
+                        except Exception as sql_ex:
+                            logger.error(f"SQLite read error for {file}: {sql_ex}")
                     
-                    # 2. إذا كان ملف نصي يحوي StringSession
                     elif file.endswith('.txt') or '.' not in file:
                         with open(f_path, "r", encoding="utf-8", errors="ignore") as rf:
                             content = rf.read().strip()
@@ -432,7 +439,6 @@ async def handle_session_file(event):
                 except Exception as ex:
                     logger.error(f"Error parsing file {file}: {ex}")
 
-        # تنظيف الملفات المؤقتة
         import shutil
         if os.path.exists(extract_dir): shutil.rmtree(extract_dir)
         if os.path.exists(path): os.remove(path)
@@ -440,7 +446,7 @@ async def handle_session_file(event):
         if success_numbers:
             await event.respond(f"✅ **تم بنجاح استخراج وحفظ ({len(success_numbers)}) رقماً في قاعدتك السحابية:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:15]]))
         else:
-            await event.respond("⚠️ لم يتم العثور على أي جلسات صالحة تفويضياً داخل هذا الأرشيف المرسل. تأكد من أن الجلسات نشطة وغير محذورة.")
+            await event.respond("⚠️ لم يتم العثور على أي جلسات صالحة تفويضياً داخل هذا الأرشيف. تأكد أن الملفات تحتوي على بيانات جلسات حقيقية ونشطة.")
     except Exception as e:
         logger.error(f"Error handling archive: {e}")
         await event.respond(f"❌ حدث خطأ تقني أثناء معالجة الملف: {e}")
@@ -589,4 +595,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

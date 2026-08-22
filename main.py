@@ -145,7 +145,7 @@ def get_main_keyboard(is_admin=False):
         [Button.inline("🤖 تشغيل بوت (إحالة / Mini App)", "ref_bot"), Button.inline("❤️ تفاعل رياكشن", "send_reaction")],
         [Button.inline("📢 انضمام لقناة/مجموعة", "join_chat"), Button.inline("🚪 مغادرة قناة/مجموعة", "leave_chat")],
         [Button.inline("📁 انضمام لمجلد", "join_folder")],
-        [Button.inline("👀 زيادة مشاهدات", "view_post"), Button.inline("🔄 فحص الحسابات", "check_accounts")],
+        [Button.inline("👀 زيادة مشاهدات", "view_post"), Button.inline("🔄 فحص وتنظيف الحسابات", "check_accounts")],
         [Button.inline("💬 رسالة للمجموعة", "send_group_msg"), Button.inline("✍️ تعليق على منشور", "comment_post")]
     ]
     if is_admin:
@@ -338,7 +338,7 @@ async def callback_handler(event):
             await event.answer()
             nums = get_user_numbers(user_id)
             if not nums: return await event.edit("⚠️ لا توجد أرقام مسجلة لفحصها.", buttons=get_back_keyboard())
-            await event.edit("⏳ **جاري فحص حالة الحسابات، يرجى الانتظار قليلاً...**")
+            await event.edit("⏳ **جاري فحص وتصفية الحسابات تلقائياً، يرجى الانتظار...**")
             alive, dead = 0, 0
             res = []
             for phone in nums:
@@ -350,8 +350,9 @@ async def callback_handler(event):
                         res.append(f"✅ `{phone}`: نشط ويعمل")
                 except:
                     dead += 1
-                    res.append(f"❌ `{phone}`: محذوف أو معطل")
-            await event.edit(f"📊 **نتيجة فحص الحسابات:**\n- الحسابات النشطة: `{alive}`\n- الحسابات المعطلة: `{dead}`\n\n" + "\n".join(res), buttons=get_back_keyboard())
+                    delete_user_number(user_id, phone) # التصفية التلقائية وحذف الحساب المعطل من القاعدة
+                    res.append(f"🗑️ `{phone}`: معطل وتم حذفه تلقائياً")
+            await event.edit(f"📊 **نتيجة فحص وتصفية الحسابات:**\n- الحسابات النشطة المتبقية: `{alive}`\n- الحسابات المعطلة (التي تم حذفها): `{dead}`\n\n" + "\n".join(res), buttons=get_back_keyboard())
 
         elif data == "send_group_msg":
             await event.answer()
@@ -434,7 +435,6 @@ async def handle_session_file(event):
                         phone_str = None
                         session_str = None
                         
-                        # استخراج البيانات مباشرة من قاعدة بيانات الـ session عبر sqlite3
                         try:
                             conn_sql = sqlite3.connect(f_path)
                             cursor_sql = conn_sql.cursor()
@@ -451,7 +451,6 @@ async def handle_session_file(event):
                         except Exception as sqlex:
                             detailed_errors.append(f"📁 المسار: `{f_path}`\n❌ خطأ قراءة SQLite: `{str(sqlex)}`")
 
-                        # التحقق من حالة الاتصال برقم الهاتف عبر الجلسة المستخرجة
                         if session_str:
                             try:
                                 async with TelegramClient(StringSession(session_str), API_ID, API_HASH) as test_c:
@@ -462,7 +461,6 @@ async def handle_session_file(event):
                             except:
                                 pass
 
-                        # الاعتماد على اسم الملف كرقم احتياطي إذا لم يتم جلب رقم الهاتف من السيرفر لحظياً
                         if not phone_str and len(file_phone_candidate) >= 10:
                             phone_str = "+" + file_phone_candidate if not file_phone_candidate.startswith("+") else file_phone_candidate
 
@@ -476,12 +474,10 @@ async def handle_session_file(event):
                     except Exception as ex:
                         detailed_errors.append(f"📁 المسار: `{f_path}`\n❌ خطأ في معالجة الجلسة: `{str(ex)}`")
 
-        # تنظيف الملفات المؤقتة
         import shutil
         if os.path.exists(extract_dir): shutil.rmtree(extract_dir)
         if os.path.exists(path): os.remove(path)
 
-        # الرد بالتقرير النهائي
         response_msg = ""
         if success_numbers:
             response_msg += f"✅ **تم تحديث واستخراج وحفظ ({len(success_numbers)}) رقماً وجلستها بنجاح تام:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:15]]) + "\n\n"
@@ -496,7 +492,7 @@ async def handle_session_file(event):
         logger.error(f"Error handling archive: {e}")
         await event.respond(f"❌ حدث خطأ تقني عام أثناء معالجة الأرشيف: {e}")
 
-# --- معالجة الحالات والمدخلات النصية ---
+# --- معالجة الحالات والمدخلات النصية (مع التنظيف التلقائي عند فشل المهام) ---
 @client.on(events.NewMessage(incoming=True))
 async def handle_user_messages(event):
     if not event.is_private or event.raw_text.startswith('/'): return
@@ -591,8 +587,8 @@ async def handle_user_messages(event):
             nums = get_user_numbers(user_id)
             if not nums: return await event.respond("⚠️ لا توجد أرقام مسجلة لديك لتنفيذ هذه العملية.")
             
-            await event.respond(f"⏳ **جاري تنفيذ العملية على (`{len(nums)}`) من حساباتك المسجلة...**")
-            succ, fail = 0, 0
+            await event.respond(f"⏳ **جاري تنفيذ العملية وتصفية الحسابات غير الصالحة تلقائياً...**")
+            succ, fail, purged = 0, 0, 0
             for phone in nums:
                 s_str = get_session_string(user_id, phone)
                 try:
@@ -624,7 +620,10 @@ async def handle_user_messages(event):
                 except Exception as ex:
                     logger.error(f"Execution error on {phone}: {ex}")
                     fail += 1
-            await event.respond(f"📊 **النتيجة النهائية للتنفيذ:**\n- ✅ نجحت على: `{succ}` حساب\n- ❌ فشلت على: `{fail}` حساب")
+                    delete_user_number(user_id, phone) # التصفية التلقائية وحذف الحساب الذي يفشل أثناء تنفيذ المهمة أيضاً
+                    purged += 1
+                    
+            await event.respond(f"📊 **النتيجة النهائية للتنفيذ والتصفية:**\n- ✅ نجحت على: `{succ}` حساب\n- ❌ فشلت وتم حذفها تلقائياً: `{purged}` حساب")
             user_states.pop(user_id, None)
     except Exception as ex:
         logger.error(f"Error in user message handler: {ex}")
@@ -640,3 +639,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+ 

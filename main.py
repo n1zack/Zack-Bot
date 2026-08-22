@@ -34,17 +34,9 @@ SUPABASE_URL = "postgresql://neondb_owner:npg_3AlBEIVMT0on@ep-lively-bonus-axwos
 # --- نظام اللغات والترجمات الشامل (Languages & Translations) ---
 TRANSLATIONS = {
     'ar': {
-        'admin_welcome': "👑 **مرحباً بك مجدداً يا زاك (المشرف العام)**\nمعرفك الشخصي (ID): `{user_id}`\n\nاختر العملية المطلوبة من القائمة أدناه:",
-        'user_welcome': "👋 **مرحباً بك {user_name}**\nمعرفك الشخصي (ID): `{user_id}`\n\nاختر العملية المطلوبة من القائمة أدناه:",
-        'not_subscribed': """#️⃣ English :
-⚠️ You are not subscribed to the bot.
-Your ID: `{user_id}`
-Contact @n1zack to activate your subscription.
-_____________________
-#️⃣ العربية :
-⚠️ أنت غير مشترك في البوت.
-معرفك (ID): `{user_id}`
-قم بالتواصل مع @n1zack لتفعيل اشتراكك.""",
+        'admin_welcome': "👑 مرحباً بك مجدداً يا زاك (المشرف العام)\nمعرفك الشخصي (ID): {user_id}\n\nاختر العملية المطلوبة من القائمة أدناه:",
+        'user_welcome': "👋 مرحباً بك {user_name}\nمعرفك الشخصي (ID): {user_id}\n\nاختر العملية المطلوبة من القائمة أدناه:",
+        'not_subscribed': "⚠️ You are not subscribed to the bot.\nYour ID: {user_id}\nContact @n1zack to activate your subscription.\n\n⚠️ أنت غير مشترك في البوت.\nمعرفك (ID): {user_id}\nقم بالتواصل مع @n1zack لتفعيل اشتراكك.",
         'unauthorized_action': "⚠️ عذراً، اشتراكك غير مفعل في النظام!",
         
         # الأزرار الرئيسية
@@ -71,7 +63,7 @@ _____________________
         'btn_prev': "⬅️ السابق",
         
         # لوحة المشرف والرسائل
-        'admin_title': "⚙️ **لوحة تحكم المشرف العام:**\nاختر الإجراء المناسب:",
+        'admin_title': "⚙️ لوحة تحكم المشرف العام:\nاختر الإجراء المناسب:",
         'btn_sub_user': "✅ تفعيل اشتراك (ID)",
         'btn_list_subs': "👥 قائمة المشتركين",
         'btn_stats': "📊 إحصائيات",
@@ -81,37 +73,29 @@ _____________________
         # رسائل الردود والعمليات
         'lang_changed': "✅ تم تغيير اللغة بنجاح إلى الإنجليزية!",
         'no_numbers': "⚠️ لا توجد أرقام مسجلة لديك حالياً.",
-        'my_numbers_title': "📱 **أرقامك المسجلة في القاعدة السحابية:**\n\n",
-        'add_phone_prompt': "➕ **إضافة رقم جديد:**\nأرسل رقم الهاتف بالصيغة الدولية الكاملة (مثال: `+961...`)",
-        'main_menu_title': "👑 **القائمة الرئيسية للنظام:**",
-        'del_numbers_title': "➖ **أرقامك المسجلة (الصفحة {page} من {total}):**\nانقر على زر الرقم أدناه لحذفه فوراً:",
+        'my_numbers_title': "📱 أرقامك المسجلة في القاعدة السحابية:\n\n",
+        'add_phone_prompt': "➕ إضافة رقم جديد:\nأرسل رقم الهاتف بالصيغة الدولية الكاملة (مثال: +961...)",
+        'main_menu_title': "👑 القائمة الرئيسية للنظام:",
+        'del_numbers_title': "➖ أرقامك المسجلة (الصفحة {page} من {total}):\nانقر على زر الرقم أدناه لحذفه فوراً:",
         'no_numbers_del': "⚠️ لا توجد أرقام مسجلة للحذف.",
         
         # رسائل العمليات التفصيلية
-        'ref_prompt': "🤖 **تشغيل بوت إحالة:**\nأرسل رابط الإحالة أو رابط البوت المطلوب:",
-        'join_prompt': "📢 **انضمام لقناة أو مجموعة:**\nأرسل رابط القناة أو المجموعة للانضمام إليها بكافة حساباتك:",
-        'leave_prompt': "🚪 **مغادرة قناة أو مجموعة:**\nأرسل رابط القناة للمغادرة:",
-        'folder_prompt': "📁 **انضمام لمجلد:**\nأرسل رابط المجلد المطلوب:",
-        'reaction_prompt': "❤️ **تفاعل رياكشن:**\nأرسل رابط المنشور متبوعاً بالإيموجي (مثال: `https://t.me/... 👍`):",
-        'view_prompt': "👀 **زيادة مشاهدات:**\nأرسل رابط المنشور لزيادة عدد المشاهدات عبر حساباتك:",
-        'group_msg_prompt': "💬 **إرسال رسالة لمجموعة:**\nأرسل رابط المجموعة ثم نص الرسالة المطلوب إرسالها:",
-        'comment_prompt': "✍️ **تعليق على منشور:**\nأرسل رابط المنشور ثم نص التعليق المطلوب:",
-        'session_login_prompt': "📥 **رفع ملف الجلسات:**\nأرسل ملف الأرشيف بصيغة `zip` أو ملف نصي يحتوي على الجلسات أو ملفات `.session` وسأقوم بسحب الأرقام وحفظها سحابياً فوراً:",
-        'checking_accounts': "⏳ **جاري فحص وتصفية الحسابات تلقائياً، يرجى الانتظار...**",
-        'executing_process': "⏳ **جاري تنفيذ العملية على حساباتك، يرجى الانتظار...**",
+        'ref_prompt': "🤖 تشغيل بوت إحالة:\nأرسل رابط الإحالة أو رابط البوت المطلوب:",
+        'join_prompt': "📢 انضمام لقناة أو مجموعة:\nأرسل رابط القناة أو المجموعة للانضمام إليها بكافة حساباتك:",
+        'leave_prompt': "🚪 مغادرة قناة أو مجموعة:\nأرسل رابط القناة للمغادرة:",
+        'folder_prompt': "📁 انضمام لمجلد:\nأرسل رابط المجلد المطلوب:",
+        'reaction_prompt': "❤️ تفاعل رياكشن:\nأرسل رابط المنشور متبوعاً بالإيموجي (مثال: https://t.me/... 👍):",
+        'view_prompt': "👀 زيادة مشاهدات:\nأرسل رابط المنشور لزيادة عدد المشاهدات عبر حساباتك:",
+        'group_msg_prompt': "💬 إرسال رسالة لمجموعة:\nأرسل رابط المجموعة ثم نص الرسالة المطلوب إرسالها:",
+        'comment_prompt': "✍️ تعليق على منشور:\nأرسل رابط المنشور ثم نص التعليق المطلوب:",
+        'session_login_prompt': "📥 رفع ملف الجلسات:\nأرسل ملف الأرشيف بصيغة zip أو ملف نصي يحتوي على الجلسات أو ملفات .session وسأقوم بسحب الأرقام وحفظها سحابياً فوراً:",
+        'checking_accounts': "⏳ جاري فحص وتصفية الحسابات تلقائياً، يرجى الانتظار...",
+        'executing_process': "⏳ جاري تنفيذ العملية على حساباتك، يرجى الانتظار...",
     },
     'en': {
-        'admin_welcome': "👑 **Welcome back Zack (Super Admin)**\nYour ID: `{user_id}`\n\nChoose the required operation from the menu below:",
-        'user_welcome': "👋 **Welcome {user_name}**\nYour ID: `{user_id}`\n\nChoose the required operation from the menu below:",
-        'not_subscribed': """#️⃣ English :
-⚠️ You are not subscribed to the bot.
-Your ID: `{user_id}`
-Contact @n1zack to activate your subscription.
-_____________________
-#️⃣ العربية :
-⚠️ أنت غير مشترك في البوت.
-معرفك (ID): `{user_id}`
-قم بالتواصل مع @n1zack لتفعيل اشتراكك.""",
+        'admin_welcome': "👑 Welcome back Zack (Super Admin)\nYour ID: {user_id}\n\nChoose the required operation from the menu below:",
+        'user_welcome': "👋 Welcome {user_name}\nYour ID: {user_id}\n\nChoose the required operation from the menu below:",
+        'not_subscribed': "⚠️ You are not subscribed to the bot.\nYour ID: {user_id}\nPlease contact @n1zack to activate your subscription.",
         'unauthorized_action': "⚠️ Sorry, your subscription is not active in the system!",
         
         # Main Buttons
@@ -138,7 +122,7 @@ _____________________
         'btn_prev': "⬅️ Previous",
         
         # Admin Panel & Messages
-        'admin_title': "⚙️ **Super Admin Control Panel:**\nChoose an appropriate action:",
+        'admin_title': "⚙️ Super Admin Control Panel:\nChoose an appropriate action:",
         'btn_sub_user': "✅ Activate Subscription (ID)",
         'btn_list_subs': "👥 Subscribers List",
         'btn_stats': "📊 Statistics",
@@ -148,24 +132,24 @@ _____________________
         # Response Messages
         'lang_changed': "✅ Language changed successfully to Arabic!",
         'no_numbers': "⚠️ You have no numbers registered currently.",
-        'my_numbers_title': "📱 **Your registered numbers in cloud database:**\n\n",
-        'add_phone_prompt': "➕ **Add new number:**\nSend the phone number in full international format (e.g., `+961...`)",
-        'main_menu_title': "👑 **Main System Menu:**",
-        'del_numbers_title': "➖ **Your Numbers (Page {page} of {total}):**\nClick a number button below to delete it instantly:",
+        'my_numbers_title': "📱 Your registered numbers in cloud database:\n\n",
+        'add_phone_prompt': "➕ Add new number:\nSend the phone number in full international format (e.g., +961...)",
+        'main_menu_title': "👑 Main System Menu:",
+        'del_numbers_title': "➖ Your Numbers (Page {page} of {total}):\nClick a number button below to delete it instantly:",
         'no_numbers_del': "⚠️ No numbers registered to delete.",
         
         # Detailed Process Prompts
-        'ref_prompt': "🤖 **Run Referral/Mini App Bot:**\nSend the referral link or bot link required:",
-        'join_prompt': "📢 **Join Channel or Group:**\nSend the channel or group link to join with all your accounts:",
-        'leave_prompt': "🚪 **Leave Channel or Group:**\nSend the channel link to leave:",
-        'folder_prompt': "📁 **Join Folder:**\nSend the required folder link:",
-        'reaction_prompt': "❤️ **Send Reaction:**\nSend the post link followed by the emoji (e.g., `https://t.me/... 👍`):",
-        'view_prompt': "👀 **View Post:**\nSend the post link to increase views across your accounts:",
-        'group_msg_prompt': "💬 **Group Message:**\nSend the group link followed by the message text:",
-        'comment_prompt': "✍️ **Comment on Post:**\nSend the post link followed by the comment text:",
-        'session_login_prompt': "📥 **Upload Sessions File:**\nSend the archive file in `zip` format or a text file containing sessions or `.session` files, and I will extract numbers and save them in the cloud instantly:",
-        'checking_accounts': "⏳ **Checking and cleaning accounts automatically, please wait...**",
-        'executing_process': "⏳ **Executing the operation on your accounts, please wait...**",
+        'ref_prompt': "🤖 Run Referral/Mini App Bot:\nSend the referral link or bot link required:",
+        'join_prompt': "📢 Join Channel or Group:\nSend the channel or group link to join with all your accounts:",
+        'leave_prompt': "🚪 Leave Channel or Group:\nSend the channel link to leave:",
+        'folder_prompt': "📁 Join Folder:\nSend the required folder link:",
+        'reaction_prompt': "❤️ Send Reaction:\nSend the post link followed by the emoji (e.g., https://t.me/... 👍):",
+        'view_prompt': "👀 View Post:\nSend the post link to increase views across your accounts:",
+        'group_msg_prompt': "💬 Group Message:\nSend the group link followed by the message text:",
+        'comment_prompt': "✍️ Comment on Post:\nSend the post link followed by the comment text:",
+        'session_login_prompt': "📥 Upload Sessions File:\nSend the archive file in zip format or a text file containing sessions or .session files, and I will extract numbers and save them in the cloud instantly:",
+        'checking_accounts': "⏳ Checking and cleaning accounts automatically, please wait...",
+        'executing_process': "⏳ Executing the operation on your accounts, please wait...",
     }
 }
 
@@ -383,17 +367,17 @@ client = TelegramClient('zack_bot_control_massive', API_ID, API_HASH)
 async def start(event):
     try:
         user_id = event.sender_id
-        register_bot_user(user_id)  # تسجيل المستخدم في قاعدة البيانات أولاً بأول
+        register_bot_user(user_id)
         user_states.pop(user_id, None)
         is_admin = (user_id == ADMIN_ID)
         
         sender = await event.get_sender()
         user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
         
-        # التحقق من الاشتراك للمستخدمين العاديين
         if not is_admin and not is_subscribed(user_id):
             await event.respond(
                 t(user_id, 'not_subscribed').format(user_id=user_id),
+                parse_mode=None,
                 buttons=get_back_keyboard(user_id)
             )
             return
@@ -403,7 +387,7 @@ async def start(event):
         else:
             welcome_text = t(user_id, 'user_welcome').format(user_name=user_name, user_id=user_id)
             
-        await event.respond(welcome_text, buttons=get_main_keyboard(user_id, is_admin))
+        await event.respond(welcome_text, parse_mode=None, buttons=get_main_keyboard(user_id, is_admin))
     except Exception as e:
         logger.error(f"Error in start command: {e}")
 
@@ -417,22 +401,13 @@ async def callback_handler(event):
             new_lang = toggle_user_lang(user_id)
             await event.answer(t(user_id, 'lang_changed'), alert=True)
             is_admin = (user_id == ADMIN_ID)
-            
-            # إذا كان المستخدم غير مشترك، قم بتحديث رسالة عدم الاشتراك باللغة الجديدة
-            if not is_admin and not is_subscribed(user_id):
-                await event.edit(
-                    t(user_id, 'not_subscribed').format(user_id=user_id),
-                    buttons=get_back_keyboard(user_id)
-                )
-                return
-
             sender = await event.get_sender()
             user_name = getattr(sender, 'first_name', 'صديقي') if sender else 'صديقي'
             if is_admin:
                 welcome_text = t(user_id, 'admin_welcome').format(user_id=user_id)
             else:
                 welcome_text = t(user_id, 'user_welcome').format(user_name=user_name, user_id=user_id)
-            await event.edit(welcome_text, buttons=get_main_keyboard(user_id, is_admin))
+            await event.edit(welcome_text, parse_mode=None, buttons=get_main_keyboard(user_id, is_admin))
             return
 
         if not data.startswith("del_page_") and not data.startswith("del_num_") and data not in ["back_home", "admin_panel"] and user_id != ADMIN_ID and not is_subscribed(user_id):
@@ -442,50 +417,50 @@ async def callback_handler(event):
         if data == "admin_panel":
             if user_id != ADMIN_ID: return
             await event.answer()
-            await event.edit(t(user_id, 'admin_title'), buttons=get_admin_panel_keyboard(user_id))
+            await event.edit(t(user_id, 'admin_title'), parse_mode=None, buttons=get_admin_panel_keyboard(user_id))
 
         elif data == "sub_user":
             if user_id != ADMIN_ID: return
             user_states[user_id] = {"action": "waiting_for_sub"}
             await event.answer()
-            await event.edit("✅ **Activate User Subscription:**\nSend in the following format:\n`ID [user_id] [days] d`\nExample: `ID 123456789 30 d`", buttons=get_back_keyboard(user_id))
+            await event.edit("✅ Activate User Subscription:\nSend in the following format:\nID [user_id] [days] d\nExample: ID 123456789 30 d", parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "list_subs":
             if user_id != ADMIN_ID: return
             subs = get_subscribers()
-            text = "👥 **Active Subscribers List:**\n\n" + ("\n".join([f"👤 ID: `{s[0]}` | ⏳ Expires: `{s[1]}`" for s in subs]) if subs else "No active subscriptions found.")
+            text = "👥 Active Subscribers List:\n\n" + ("\n".join([f"👤 ID: {s[0]} | ⏳ Expires: {s[1]}" for s in subs]) if subs else "No active subscriptions found.")
             await event.answer()
-            await event.edit(text, buttons=get_back_keyboard(user_id))
+            await event.edit(text, parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "stats":
             if user_id != ADMIN_ID: return
             total_users = get_total_bot_users()
             subs = get_subscribers()
             await event.answer()
-            await event.edit(f"📊 **System Statistics:**\n- Total users opened bot: `{total_users}`\n- Total active subscribers: `{len(subs)}`\n- Connection Status: Stable & Cloud-powered via Neon ✅", buttons=get_back_keyboard(user_id))
+            await event.edit(f"📊 System Statistics:\n- Total users opened bot: {total_users}\n- Total active subscribers: {len(subs)}\n- Connection Status: Stable & Cloud-powered via Neon ✅", parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "msg_user":
             if user_id != ADMIN_ID: return
             user_states[user_id] = {"action": "waiting_for_msg_user"}
             await event.answer()
-            await event.edit("✉️ **Message Specific User:**\nSend in format:\n`[user_id] [message_text]`", buttons=get_back_keyboard(user_id))
+            await event.edit("✉️ Message Specific User:\nSend in format:\n[user_id] [message_text]", parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "msg_all":
             if user_id != ADMIN_ID: return
             user_states[user_id] = {"action": "waiting_for_msg_all"}
             await event.answer()
-            await event.edit("📢 **Broadcast Message:**\nSend the broadcast text you want to send to all users:", buttons=get_back_keyboard(user_id))
+            await event.edit("📢 Broadcast Message:\nSend the broadcast text you want to send to all users:", parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "my_numbers":
             await event.answer()
             numbers = get_user_numbers(user_id)
-            text = t(user_id, 'my_numbers_title') + ("\n".join([f"📱 `{n}`" for n in numbers]) if numbers else t(user_id, 'no_numbers'))
-            await event.edit(text, buttons=get_back_keyboard(user_id))
+            text = t(user_id, 'my_numbers_title') + ("\n".join([f"📱 {n}" for n in numbers]) if numbers else t(user_id, 'no_numbers'))
+            await event.edit(text, parse_mode=None, buttons=get_back_keyboard(user_id))
         
         elif data == "add_number":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_phone"}
-            await event.edit(t(user_id, 'add_phone_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'add_phone_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
             
         elif data.startswith("del_page_"):
             await event.answer()
@@ -493,7 +468,7 @@ async def callback_handler(event):
             numbers = get_user_numbers(user_id)
             
             if not numbers:
-                await event.edit(t(user_id, 'no_numbers_del'), buttons=get_back_keyboard(user_id))
+                await event.edit(t(user_id, 'no_numbers_del'), parse_mode=None, buttons=get_back_keyboard(user_id))
                 return
                 
             per_page = 6
@@ -522,7 +497,7 @@ async def callback_handler(event):
             keyboard.append([Button.inline(t(user_id, 'btn_back'), "back_home")])
             
             header_text = t(user_id, 'del_numbers_title').format(page=page + 1, total=total_pages)
-            await event.edit(header_text, buttons=keyboard)
+            await event.edit(header_text, parse_mode=None, buttons=keyboard)
 
         elif data.startswith("del_num_"):
             parts = data.split("_")
@@ -534,7 +509,7 @@ async def callback_handler(event):
             
             numbers = get_user_numbers(user_id)
             if not numbers:
-                await event.edit(t(user_id, 'no_numbers_del'), buttons=get_back_keyboard(user_id))
+                await event.edit(t(user_id, 'no_numbers_del'), parse_mode=None, buttons=get_back_keyboard(user_id))
                 return
                 
             per_page = 6
@@ -563,16 +538,16 @@ async def callback_handler(event):
             keyboard.append([Button.inline(t(user_id, 'btn_back'), "back_home")])
             
             header_text = t(user_id, 'del_numbers_title').format(page=page + 1, total=total_pages)
-            await event.edit(header_text, buttons=keyboard)
+            await event.edit(header_text, parse_mode=None, buttons=keyboard)
 
         elif data == "session_login":
             await event.answer()
-            await event.edit(t(user_id, 'session_login_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'session_login_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
             
         elif data == "export_sessions":
             await event.answer()
             nums = get_user_numbers(user_id)
-            if not nums: return await event.edit(t(user_id, 'no_numbers'), buttons=get_back_keyboard(user_id))
+            if not nums: return await event.edit(t(user_id, 'no_numbers'), parse_mode=None, buttons=get_back_keyboard(user_id))
             
             zip_filename = f"sessions_{user_id}.zip"
             with zipfile.ZipFile(zip_filename, 'w') as zipf:
@@ -585,43 +560,43 @@ async def callback_handler(event):
                         os.remove(t_name)
             await event.respond(file=zip_filename)
             os.remove(zip_filename)
-            await event.edit("✅ All sessions exported and sent as a ZIP file successfully!", buttons=get_back_keyboard(user_id))
+            await event.edit("✅ All sessions exported and sent as a ZIP file successfully!", parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "ref_bot":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_ref"}
-            await event.edit(t(user_id, 'ref_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'ref_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "join_chat":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_join"}
-            await event.edit(t(user_id, 'join_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'join_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
             
         elif data == "leave_chat":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_leave"}
-            await event.edit(t(user_id, 'leave_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'leave_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
             
         elif data == "join_folder":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_folder"}
-            await event.edit(t(user_id, 'folder_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'folder_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "send_reaction":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_reaction"}
-            await event.edit(t(user_id, 'reaction_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'reaction_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "view_post":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_view"}
-            await event.edit(t(user_id, 'view_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'view_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "check_accounts":
             await event.answer()
             nums = get_user_numbers(user_id)
-            if not nums: return await event.edit(t(user_id, 'no_numbers'), buttons=get_back_keyboard(user_id))
-            await event.edit(t(user_id, 'checking_accounts'))
+            if not nums: return await event.edit(t(user_id, 'no_numbers'), parse_mode=None, buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'checking_accounts'), parse_mode=None)
             alive, dead = 0, 0
             res = []
             for phone in nums:
@@ -630,37 +605,29 @@ async def callback_handler(event):
                     async with TelegramClient(StringSession(s_str), API_ID, API_HASH, timeout=10) as acc:
                         await acc.get_me()
                         alive += 1
-                        res.append(f"✅ `{phone}`: Active & Working")
+                        res.append(f"✅ {phone}: Active & Working")
                 except:
                     dead += 1
                     delete_user_number(user_id, phone)
-                    res.append(f"🗑️ `{phone}`: Dead & Deleted automatically")
+                    res.append(f"🗑️ {phone}: Dead & Deleted automatically")
                 await asyncio.sleep(0.5)
-            await event.edit(f"📊 **Accounts Check Results:**\n- Active accounts remaining: `{alive}`\n- Dead accounts (deleted): `{dead}`\n\n" + "\n".join(res), buttons=get_back_keyboard(user_id))
+            await event.edit(f"📊 Accounts Check Results:\n- Active accounts remaining: {alive}\n- Dead accounts (deleted): {dead}\n\n" + "\n".join(res), parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "send_group_msg":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_group_msg"}
-            await event.edit(t(user_id, 'group_msg_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'group_msg_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "comment_post":
             await event.answer()
             user_states[user_id] = {"action": "waiting_for_comment"}
-            await event.edit(t(user_id, 'comment_prompt'), buttons=get_back_keyboard(user_id))
+            await event.edit(t(user_id, 'comment_prompt'), parse_mode=None, buttons=get_back_keyboard(user_id))
 
         elif data == "back_home":
             await event.answer()
             user_states.pop(user_id, None)
             is_admin = (user_id == ADMIN_ID)
-            
-            if not is_admin and not is_subscribed(user_id):
-                await event.edit(
-                    t(user_id, 'not_subscribed').format(user_id=user_id),
-                    buttons=get_back_keyboard(user_id)
-                )
-                return
-
-            await event.edit(t(user_id, 'main_menu_title'), buttons=get_main_keyboard(user_id, is_admin))
+            await event.edit(t(user_id, 'main_menu_title'), parse_mode=None, buttons=get_main_keyboard(user_id, is_admin))
             
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
@@ -671,7 +638,7 @@ async def handle_session_file(event):
     try:
         user_id = event.sender_id
         if user_id != ADMIN_ID and not is_subscribed(user_id):
-            return
+            return await event.respond("⚠️ Sorry, you are not subscribed to use this feature.")
 
         path = await event.download_media()
         extract_dir = f"extracted_full_{user_id}"
@@ -684,7 +651,7 @@ async def handle_session_file(event):
             import shutil
             shutil.move(path, os.path.join(extract_dir, "file_direct"))
 
-        await event.respond("🔍 **Reading sessions and generating true StringSession accurately...**")
+        await event.respond("🔍 Reading sessions and generating true StringSession accurately...", parse_mode=None)
         success_numbers = []
         detailed_errors = []
 
@@ -739,7 +706,7 @@ async def handle_session_file(event):
                                 mem_session.auth_key = auth_key
                                 session_str = mem_session.save()
                         except Exception as sqlex:
-                            detailed_errors.append(f"📁 Path: `{f_path}`\n❌ SQLite read error: `{str(sqlex)}`")
+                            detailed_errors.append(f"📁 Path: {f_path}\n❌ SQLite read error: {str(sqlex)}")
 
                         if session_str:
                             try:
@@ -760,9 +727,9 @@ async def handle_session_file(event):
                                 success_numbers.append(phone_str)
                         else:
                             if f_path not in str(detailed_errors):
-                                detailed_errors.append(f"📁 Path: `{f_path}`\n⚠️ Could not generate valid StringSession.")
+                                detailed_errors.append(f"📁 Path: {f_path}\n⚠️ Could not generate valid StringSession.")
                     except Exception as ex:
-                        detailed_errors.append(f"📁 Path: `{f_path}`\n❌ Session process error: `{str(ex)}`")
+                        detailed_errors.append(f"📁 Path: {f_path}\n❌ Session process error: {str(ex)}")
 
         import shutil
         if os.path.exists(extract_dir): shutil.rmtree(extract_dir)
@@ -770,28 +737,23 @@ async def handle_session_file(event):
 
         response_msg = ""
         if success_numbers:
-            response_msg += f"✅ **Successfully updated and saved ({len(success_numbers)}) numbers and their sessions:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:15]]) + "\n\n"
+            response_msg += f"✅ Successfully updated and saved ({len(success_numbers)}) numbers and their sessions:\n" + "\n".join([f"- {n}" for n in success_numbers[:15]]) + "\n\n"
         else:
-            response_msg += "❌ **No valid sessions found for conversion.**\n\n"
+            response_msg += "❌ No valid sessions found for conversion.\n\n"
 
         if detailed_errors:
-            response_msg += "📋 **Files Report:**\n" + "\n\n".join(detailed_errors[:5])
+            response_msg += "📋 Files Report:\n" + "\n\n".join(detailed_errors[:5])
 
-        await event.respond(response_msg)
+        await event.respond(response_msg, parse_mode=None)
     except Exception as e:
         logger.error(f"Error handling archive: {e}")
-        await event.respond(f"❌ General technical error processing archive: {e}")
+        await event.respond(f"❌ General technical error processing archive: {e}", parse_mode=None)
 
 # --- معالجة الحالات والمدخلات النصية مع حماية ضد التجميد نهائياً ---
 @client.on(events.NewMessage(incoming=True))
 async def handle_user_messages(event):
     if not event.is_private or event.raw_text.startswith('/'): return
     user_id = event.sender_id
-    
-    # منع المستخدمين غير المشتركين من إرسال أوامر نصية عشوائية تتسبب في مشاكل
-    if user_id != ADMIN_ID and not is_subscribed(user_id):
-        return
-
     text = event.raw_text.strip()
     if user_id not in user_states: return
 
@@ -801,9 +763,9 @@ async def handle_user_messages(event):
             parts = text.split()
             target_id, days = int(parts[1]), int(parts[2])
             expiry = add_subscriber(target_id, days)
-            await event.respond(f"✅ **Subscription activated successfully in cloud:**\n- User: `{target_id}`\n- Duration: `{days}` days\n- Expiry: `{expiry}`")
+            await event.respond(f"✅ Subscription activated successfully in cloud:\n- User: {target_id}\n- Duration: {days} days\n- Expiry: {expiry}", parse_mode=None)
             try:
-                await client.send_message(target_id, f"🎉 **Congratulations! Your subscription has been activated.**\n⏳ Expiry Date: `{expiry}`\nYou can now use all bot features fully.")
+                await client.send_message(target_id, f"🎉 Congratulations! Your subscription has been activated.\n⏳ Expiry Date: {expiry}\nYou can now use all bot features fully.", parse_mode=None)
             except:
                 pass
             user_states.pop(user_id, None)
@@ -812,8 +774,8 @@ async def handle_user_messages(event):
             parts = text.split(maxsplit=1)
             target_id = int(parts[0])
             msg_content = parts[1]
-            await client.send_message(target_id, f"📬 **Official Administration Message:**\n\n{msg_content}")
-            await event.respond(f"✅ Message sent to user `{target_id}` successfully.")
+            await client.send_message(target_id, f"📬 Official Administration Message:\n\n{msg_content}", parse_mode=None)
+            await event.respond(f"✅ Message sent to user {target_id} successfully.", parse_mode=None)
             user_states.pop(user_id, None)
 
         elif action == "waiting_for_msg_all" and user_id == ADMIN_ID:
@@ -824,16 +786,16 @@ async def handle_user_messages(event):
             cursor.close()
             conn.close()
             success_cnt = 0
-            await event.respond(f"⏳ **Broadcasting message to (`{len(all_users)}`) users...**")
+            await event.respond(f"⏳ Broadcasting message to ({len(all_users)}) users...", parse_mode=None)
             for uid in all_users:
                 if uid == ADMIN_ID: continue
                 try:
-                    await client.send_message(uid, f"📢 **Important Administration Announcement:**\n\n{text}")
+                    await client.send_message(uid, f"📢 Important Administration Announcement:\n\n{text}", parse_mode=None)
                     success_cnt += 1
                     await asyncio.sleep(0.2)
                 except:
                     pass
-            await event.respond(f"✅ **Broadcast complete:** Reached (`{success_cnt}`) users.")
+            await event.respond(f"✅ Broadcast complete: Reached ({success_cnt}) users.", parse_mode=None)
             user_states.pop(user_id, None)
 
         elif action == "waiting_for_phone":
@@ -841,7 +803,7 @@ async def handle_user_messages(event):
             await tc.connect()
             sent = await tc.send_code_request(text)
             user_states[user_id].update({"phone": text, "action": "waiting_for_code", "tc": tc, "hash": sent.phone_code_hash})
-            await event.respond("✅ **Verification code sent successfully to Telegram app of the number.**\nSend the verification code now:")
+            await event.respond("✅ Verification code sent successfully to Telegram app of the number.\nSend the verification code now:", parse_mode=None)
 
         elif action == "waiting_for_code":
             st = user_states[user_id]
@@ -850,13 +812,13 @@ async def handle_user_messages(event):
                 s_str = st["tc"].session.save()
                 add_user_number(user_id, st["phone"], s_str)
                 await st["tc"].disconnect()
-                await event.respond("🎉 **Logged in and account saved in cloud database successfully!**")
+                await event.respond("🎉 Logged in and account saved in cloud database successfully!", parse_mode=None)
                 user_states.pop(user_id, None)
             except SessionPasswordNeededError:
                 user_states[user_id]["action"] = "waiting_for_password"
-                await event.respond("🔒 **This account is protected by 2FA password.**\nSend the account password now:")
+                await event.respond("🔒 This account is protected by 2FA password.\nSend the account password now:", parse_mode=None)
             except Exception as ex:
-                await event.respond(f"❌ Incorrect or expired verification code: {ex}")
+                await event.respond(f"❌ Incorrect or expired verification code: {ex}", parse_mode=None)
 
         elif action == "waiting_for_password":
             st = user_states[user_id]
@@ -865,19 +827,19 @@ async def handle_user_messages(event):
                 s_str = st["tc"].session.save()
                 add_user_number(user_id, st["phone"], s_str)
                 await st["tc"].disconnect()
-                await event.respond("🎉 **2FA verified and account saved to cloud successfully!**")
+                await event.respond("🎉 2FA verified and account saved to cloud successfully!", parse_mode=None)
                 user_states.pop(user_id, None)
             except Exception as ex:
-                await event.respond(f"❌ Incorrect password: {ex}")
+                await event.respond(f"❌ Incorrect password: {ex}", parse_mode=None)
 
         elif action in ["waiting_for_ref", "waiting_for_join", "waiting_for_leave", "waiting_for_folder", "waiting_for_reaction", "waiting_for_view", "waiting_for_group_msg", "waiting_for_comment"]:
             parts = text.split(maxsplit=1)
             link = parts[0]
             extra = parts[1] if len(parts) > 1 else "👍"
             nums = get_user_numbers(user_id)
-            if not nums: return await event.respond(t(user_id, 'no_numbers'))
+            if not nums: return await event.respond(t(user_id, 'no_numbers'), parse_mode=None)
             
-            await event.respond(t(user_id, 'executing_process'))
+            await event.respond(t(user_id, 'executing_process'), parse_mode=None)
             succ, fail = 0, 0
             
             for phone in nums:
@@ -936,11 +898,11 @@ async def handle_user_messages(event):
                 
                 await asyncio.sleep(1.5)
                     
-            await event.respond(f"📊 **Final Execution Results:**\n- ✅ Successful on: `{succ}` accounts\n- ❌ Failed/Timed out on: `{fail}` accounts")
+            await event.respond(f"📊 Final Execution Results:\n- ✅ Successful on: {succ} accounts\n- ❌ Failed/Timed out on: {fail} accounts", parse_mode=None)
             user_states.pop(user_id, None)
     except Exception as ex:
         logger.error(f"Error in user message handler: {ex}")
-        await event.respond(f"❌ Unexpected error while processing your request: {ex}")
+        await event.respond(f"❌ Unexpected error while processing your request: {ex}", parse_mode=None)
         user_states.pop(user_id, None)
 
 async def main():

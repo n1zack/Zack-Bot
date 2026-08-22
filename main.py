@@ -26,7 +26,8 @@ API_HASH = '5c3f24ee62d7a7e46601a53f571f62cc'
 ADMIN_ID = 1251313339
 
 # رابط قاعدة البيانات السحابية (Supabase)
-SUPABASE_URL = "postgresql://postgres:Zack881881zZ@db.hyjlkcjuecurzbjrphca.supabase.co:5432/postgres"
+SUPABASE_URL = "postgresql://postgres:Zack881881zZ%40@db.hyjlkcjuecurzbjrphca.supabase.co:6543/postgres"
+
 # ==========================================================
 
 # --- بناء وتهيئة قاعدة البيانات السحابية (Supabase / PostgreSQL) ---

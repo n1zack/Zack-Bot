@@ -25,14 +25,13 @@ API_ID = 31470691
 API_HASH = '5c3f24ee62d7a7e46601a53f571f62cc'
 ADMIN_ID = 1251313339
 
-# رابط قاعدة البيانات السحابية (Supabase) مع بورت الـ Pooling (6543) وتشفير الرمز
-SUPABASE_URL = "postgresql://postgres:Zack881881zZ%40@db.hyjlkcjuecurzbjrphca.supabase.co:6543/postgres"
+# رابط قاعدة البيانات السحابية الجديدة (Neon.tech)
+SUPABASE_URL = "postgresql://neondb_owner:npg_3AlBEIVMT0on@ep-lively-bonus-axwosu8s.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
 # ==========================================================
 
-# --- بناء وتهيئة قاعدة البيانات السحابية (Supabase / PostgreSQL) ---
+# --- بناء وتهيئة قاعدة البيانات السحابية (Neon / PostgreSQL) ---
 def get_db_connection():
-    # إجبار الاتصال على العمل بقوة وتجاوز مشاكل الشبكة على سيرفرات الاستضافات السحابية
     return psycopg2.connect(SUPABASE_URL, connect_timeout=10)
 
 def init_db():
@@ -55,9 +54,9 @@ def init_db():
         conn.commit()
         cursor.close()
         conn.close()
-        logger.info("Supabase database initialized successfully.")
+        logger.info("Neon database initialized successfully.")
     except Exception as e:
-        logger.error(f"Error initializing Supabase database: {e}")
+        logger.error(f"Error initializing Neon database: {e}")
 
 init_db()
 
@@ -137,7 +136,7 @@ def get_subscribers():
     conn.close()
     return rows
 
-# --- واجهات وكيبوردات النظام المطابقة تماماً لـ Keyboards.py ---
+# --- واجهات وكيبوردات النظام ---
 def get_main_keyboard(is_admin=False):
     keyboard = [
         [Button.inline("📱 أرقامي", "my_numbers"), Button.inline("➕ إضافة رقم", "add_number"), Button.inline("➖ حذف رقم", "delete_number")],
@@ -252,7 +251,7 @@ async def callback_handler(event):
 
         elif data == "stats":
             await event.answer()
-            await event.edit(f"📊 **إحصائيات النظام:**\n- معرف المستخدم: `{user_id}`\n- حالة الاتصال: مستقر ويعمل بكفاءة سحابياً عبر Supabase ✅", buttons=get_back_keyboard())
+            await event.edit(f"📊 **إحصائيات النظام:**\n- معرف المستخدم: `{user_id}`\n- حالة الاتصال: مستقر ويعمل بكفاءة سحابياً عبر Neon ✅", buttons=get_back_keyboard())
 
         elif data == "msg_user":
             if user_id != ADMIN_ID: return
@@ -372,7 +371,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة ملفات الأرشيف والجلسات بدقة كاملة ومطابقة تامة ---
+# --- معالجة ملفات الأرشيف والجلسات ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -437,7 +436,7 @@ async def handle_session_file(event):
         logger.error(f"Error handling archive: {e}")
         await event.respond(f"❌ حدث خطأ تقني أثناء معالجة الملف: {e}")
 
-# --- معالجة كافة الحالات والمدخلات النصية للمستخدمين والمشرفين ---
+# --- معالجة الحالات والمدخلات النصية ---
 @client.on(events.NewMessage(incoming=True))
 async def handle_user_messages(event):
     if not event.is_private or event.raw_text.startswith('/'): return
@@ -576,7 +575,7 @@ async def main():
     await start_web_server()
     asyncio.create_task(keep_alive())
     await client.start(bot_token=BOT_TOKEN)
-    logger.info("Massive Control Bot started successfully with Supabase and running...")
+    logger.info("Massive Control Bot started successfully with Neon and running...")
     await client.run_until_disconnected()
 
 if __name__ == "__main__":

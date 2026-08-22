@@ -25,14 +25,15 @@ API_ID = 31470691
 API_HASH = '5c3f24ee62d7a7e46601a53f571f62cc'
 ADMIN_ID = 1251313339
 
-# رابط قاعدة البيانات السحابية (Supabase)
+# رابط قاعدة البيانات السحابية (Supabase) مع بورت الـ Pooling (6543) وتشفير الرمز
 SUPABASE_URL = "postgresql://postgres:Zack881881zZ%40@db.hyjlkcjuecurzbjrphca.supabase.co:6543/postgres"
 
 # ==========================================================
 
 # --- بناء وتهيئة قاعدة البيانات السحابية (Supabase / PostgreSQL) ---
 def get_db_connection():
-    return psycopg2.connect(SUPABASE_URL)
+    # إجبار الاتصال على العمل بقوة وتجاوز مشاكل الشبكة على سيرفرات الاستضافات السحابية
+    return psycopg2.connect(SUPABASE_URL, connect_timeout=10)
 
 def init_db():
     try:
@@ -251,7 +252,7 @@ async def callback_handler(event):
 
         elif data == "stats":
             await event.answer()
-            await event.edit(f"📊 **إحصائيات النظام:**\n- معرف المستخدم: `{user_id}`\n- حالة الاتصال: مستقر ويعمل بكفاءة وصحابياً عبر Supabase ✅", buttons=get_back_keyboard())
+            await event.edit(f"📊 **إحصائيات النظام:**\n- معرف المستخدم: `{user_id}`\n- حالة الاتصال: مستقر ويعمل بكفاءة سحابياً عبر Supabase ✅", buttons=get_back_keyboard())
 
         elif data == "msg_user":
             if user_id != ADMIN_ID: return

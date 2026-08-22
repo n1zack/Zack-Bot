@@ -36,7 +36,7 @@ TRANSLATIONS = {
     'ar': {
         'admin_welcome': "👑 **مرحباً بك مجدداً يا زاك (المشرف العام)**\nمعرفك الشخصي (ID): `{user_id}`\n\nاختر العملية المطلوبة من القائمة أدناه:",
         'user_welcome': "👋 **مرحباً بك {user_name}**\nمعرفك الشخصي (ID): `{user_id}`\n\nاختر العملية المطلوبة من القائمة أدناه:",
-        'not_subscribed': "#️⃣ English :
+        'not_subscribed': """#️⃣ English :
 ⚠️ You are not subscribed to the bot.
 Your ID \n (ID): `{user_id}`\n
 Contact @n1zack to activate your subscription.
@@ -44,7 +44,7 @@ _____________________
 #️⃣ العربية :
 ⚠️ أنت غير مشترك في البوت.
 معرفك \n (ID): `{user_id}`\n 
-قم بالتواصل مع @n1zack لتفعيل اشتراكك.",
+قم بالتواصل مع @n1zack لتفعيل اشتراكك.""",
         'unauthorized_action': "⚠️ عذراً، اشتراكك غير مفعل في النظام!",
         
         # الأزرار الرئيسية
@@ -922,3 +922,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+ 

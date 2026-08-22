@@ -10,7 +10,7 @@ from aiohttp import web
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession, MemorySession
 from telethon.errors import SessionPasswordNeededError
-from telethon.tl.functions.messages import ImportChatInviteRequest, StartBotRequest
+from telethon.tl.functions.messages import ImportChatInviteRequest, StartBotRequest, GetMessagesViewsRequest
 from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest
 from telethon.tl.functions.chatlists import JoinChatlistInviteRequest, CheckChatlistInviteRequest
 from telethon.tl.functions.messages import SendReactionRequest
@@ -350,7 +350,7 @@ async def callback_handler(event):
                         res.append(f"✅ `{phone}`: نشط ويعمل")
                 except:
                     dead += 1
-                    delete_user_number(user_id, phone) # التصفية التلقائية وحذف الحساب المعطل من القاعدة
+                    delete_user_number(user_id, phone)
                     res.append(f"🗑️ `{phone}`: معطل وتم حذفه تلقائياً")
             await event.edit(f"📊 **نتيجة فحص وتصفية الحسابات:**\n- الحسابات النشطة المتبقية: `{alive}`\n- الحسابات المعطلة (التي تم حذفها): `{dead}`\n\n" + "\n".join(res), buttons=get_back_keyboard())
 
@@ -403,7 +403,6 @@ async def handle_session_file(event):
                 if file.endswith('.session') or '.' not in file or file.endswith('.txt'):
                     file_phone_candidate = "".join([c for c in file if c.isdigit()])
                     
-                    # 1. معالجة الملفات النصية المباشرة التي تحتوي StringSession
                     if file.endswith('.txt') or '.' not in file:
                         try:
                             with open(f_path, 'r', encoding='utf-8', errors='ignore') as tf:
@@ -430,7 +429,6 @@ async def handle_session_file(event):
                         except:
                             pass
 
-                    # 2. معالجة ملفات SQLite (.session) واستخراج المفاتيح بدقة لتكوين StringSession صالح
                     try:
                         phone_str = None
                         session_str = None
@@ -492,7 +490,7 @@ async def handle_session_file(event):
         logger.error(f"Error handling archive: {e}")
         await event.respond(f"❌ حدث خطأ تقني عام أثناء معالجة الأرشيف: {e}")
 
-# --- معالجة الحالات والمدخلات النصية (مع التنظيف التلقائي عند فشل المهام) ---
+# --- معالجة الحالات والمدخلات النصية (مع التعديل السليم لمشكلة المجلدات والمشاهدات بدون حذف الحسابات النشطة) ---
 @client.on(events.NewMessage(incoming=True))
 async def handle_user_messages(event):
     if not event.is_private or event.raw_text.startswith('/'): return
@@ -587,8 +585,8 @@ async def handle_user_messages(event):
             nums = get_user_numbers(user_id)
             if not nums: return await event.respond("⚠️ لا توجد أرقام مسجلة لديك لتنفيذ هذه العملية.")
             
-            await event.respond(f"⏳ **جاري تنفيذ العملية وتصفية الحسابات غير الصالحة تلقائياً...**")
-            succ, fail, purged = 0, 0, 0
+            await event.respond(f"⏳ **جاري تنفيذ العملية على حساباتك، يرجى الانتظار...**")
+            succ, fail = 0, 0
             for phone in nums:
                 s_str = get_session_string(user_id, phone)
                 try:
@@ -606,11 +604,16 @@ async def handle_user_messages(event):
                             p_l = link.split("/")
                             await acc(SendReactionRequest(peer=await acc.get_entity(p_l[-2]), msg_id=int(p_l[-1]), reaction=[ReactionEmoji(emoticon=extra)]))
                         elif action == "waiting_for_view":
+                            # التعديل الصحيح لزيادة المشاهدات عبر استدعاء GetMessagesViewsRequest لجلب وزيادة العداد رسمياً
                             p_l = link.split("/")
-                            await acc.get_messages(await acc.get_entity(p_l[-2]), ids=int(p_l[-1]))
+                            channel_entity = await acc.get_entity(p_l[-2])
+                            msg_id = int(p_l[-1])
+                            await acc(GetMessagesViewsRequest(peer=channel_entity, id=[msg_id], increment=True))
                         elif action == "waiting_for_folder":
-                            slug = link.split("/")[-1].replace("addlist/", "")
-                            await acc(JoinChatlistInviteRequest(slug=slug, peers=[]))
+                            # التعديل الصحيح لفحص وقبول روابط المجلدات (addlist) بدون حذف الحسابات
+                            slug = link.split("/")[-1].replace("addlist/", "").split("?")[0]
+                            folder_info = await acc(CheckChatlistInviteRequest(slug=slug))
+                            await acc(JoinChatlistInviteRequest(slug=slug, peers=folder_info.peers))
                         elif action == "waiting_for_group_msg":
                             await acc.send_message(link, extra)
                         elif action == "waiting_for_comment":
@@ -620,12 +623,11 @@ async def handle_user_messages(event):
                 except Exception as ex:
                     logger.error(f"Execution error on {phone}: {ex}")
                     fail += 1
-                    delete_user_number(user_id, phone) # التصفية التلقائية وحذف الحساب الذي يفشل أثناء تنفيذ المهمة أيضاً
-                    purged += 1
                     
-            await event.respond(f"📊 **النتيجة النهائية للتنفيذ والتصفية:**\n- ✅ نجحت على: `{succ}` حساب\n- ❌ فشلت وتم حذفها تلقائياً: `{purged}` حساب")
+            await event.respond(f"📊 **النتيجة النهائية للتنفيذ:**\n- ✅ نجحت على: `{succ}` حساب\n- ❌ فشلت على: `{fail}` حساب")
             user_states.pop(user_id, None)
     except Exception as ex:
+    
         logger.error(f"Error in user message handler: {ex}")
         await event.respond(f"❌ حدث خطأ غير متوقع أثناء معالجة طلبك: {ex}")
         user_states.pop(user_id, None)
@@ -639,4 +641,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

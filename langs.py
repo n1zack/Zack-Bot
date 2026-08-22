@@ -29,13 +29,20 @@ TRANSLATIONS = {
         'btn_next': "التالي ➡️",
         'btn_prev': "⬅️ السابق",
         
-        # لوحة المشرف
+        # لوحة المشرف والرسائل
         'admin_title': "⚙️ **لوحة تحكم المشرف العام:**\nاختر الإجراء المناسب:",
         'btn_sub_user': "✅ تفعيل اشتراك (ID)",
         'btn_list_subs': "👥 قائمة المشتركين",
         'btn_stats': "📊 إحصائيات",
         'btn_msg_user': "✉️ رسالة لمستخدم",
         'btn_msg_all': "📢 رسالة للكل",
+        
+        # رسائل الردود
+        'lang_changed': "✅ تم تغيير اللغة بنجاح!",
+        'no_numbers': "⚠️ لا توجد أرقام مسجلة لديك حالياً.",
+        'my_numbers_title': "📱 **أرقامك المسجلة في القاعدة السحابية:**\n\n",
+        'add_phone_prompt': "➕ **إضافة رقم جديد:**\nأرسل رقم الهاتف بالصيغة الدولية الكاملة (مثال: `+961...`)",
+        'admin_panel_title': "⚙️ **Super Admin Control Panel:**\nChoose an appropriate action:",
     },
     'en': {
         'admin_welcome': "👑 **Welcome back Zack (Super Admin)**\nYour ID: `{user_id}`\n\nChoose the required operation from the menu below:",
@@ -65,24 +72,30 @@ TRANSLATIONS = {
         'btn_next': "Next ➡️",
         'btn_prev': "⬅️ Previous",
         
-        # Admin Panel
+        # Admin Panel & Messages
         'admin_title': "⚙️ **Super Admin Control Panel:**\nChoose an appropriate action:",
         'btn_sub_user': "✅ Activate Subscription (ID)",
         'btn_list_subs': "👥 Subscribers List",
         'btn_stats': "📊 Statistics",
         'btn_msg_user': "✉️ Message User",
         'btn_msg_all': "📢 Broadcast to All",
+        
+        # Response Messages
+        'lang_changed': "✅ Language changed successfully!",
+        'no_numbers': "⚠️ You have no numbers registered currently.",
+        'my_numbers_title': "📱 **Your registered numbers in cloud database:**\n\n",
+        'add_phone_prompt': "➕ **Add new number:**\nSend the phone number in full international format (e.g., `+961...`)",
+        'admin_panel_title': "⚙️ **Super Admin Control Panel:**\nChoose an appropriate action:",
     }
 }
 
-# حافظة مؤقتة للغات المستخدمين بالذاكرة (بدون قاعدة بيانات)
 user_languages = {}
 
 def get_user_lang(user_id):
     return user_languages.get(user_id, 'ar')
 
 def toggle_user_lang(user_id):
-    current = get_user_languages = get_user_lang(user_id)
+    current = get_user_lang(user_id)
     new_lang = 'en' if current == 'ar' else 'ar'
     user_languages[user_id] = new_lang
     return new_lang
@@ -90,4 +103,3 @@ def toggle_user_lang(user_id):
 def t(user_id, key):
     lang = get_user_lang(user_id)
     return TRANSLATIONS.get(lang, TRANSLATIONS['ar']).get(key, key)
-

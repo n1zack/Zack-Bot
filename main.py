@@ -372,7 +372,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة واستخراج الجلسات وتوليد StringSession السليم 100% ---
+# --- معالجة واستخراج الجلسات وتوليد StringSession السليم 100% من ملفات SQLite ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -391,7 +391,7 @@ async def handle_session_file(event):
             import shutil
             shutil.move(path, os.path.join(extract_dir, "file_direct"))
 
-        await event.respond("🔍 **جاري فحص الملفات، استخراج الجلسات الحقيقية وربطها سحابياً...**")
+        await event.respond("🔍 **جاري قراءة وتحويل الجلسات البرمجية واستخراج الـ StringSession الحقيقي بدقة...**")
         success_numbers = []
         detailed_errors = []
 
@@ -402,7 +402,7 @@ async def handle_session_file(event):
                 if file.endswith('.session') or '.' not in file or file.endswith('.txt'):
                     file_phone_candidate = "".join([c for c in file if c.isdigit()])
                     
-                    # 1. فحص الملفات النصية أو التي تحوي StringSession مباشر
+                    # 1. معالجة الملفات النصية المباشرة التي تحتوي StringSession
                     if file.endswith('.txt') or '.' not in file:
                         try:
                             with open(f_path, 'r', encoding='utf-8', errors='ignore') as tf:
@@ -429,77 +429,67 @@ async def handle_session_file(event):
                         except:
                             pass
 
-                    # 2. فحص ملفات SQLite (.session) واستخراج الجلسة بالطريقة المباشرة والسليمة
+                    # 2. معالجة ملفات SQLite (.session) واستخراج المفاتيح بدقة لتكوين StringSession صالح
                     try:
-                        # استخدام StringSession مع مسار ملف الـ SQLite مباشرة (يغني عن استخراج الـ auth_key يدوياً لتفادي أخطاء الـ EOF)
-                        temp_session = StringSession()
-                        # بدلاً من القراءة اليدوية المعقدة للـ SQLite، نستخدم مكتبة Telethon نفسها لفتح الملف المؤقت كـ SqliteSession أو تحويله
-                        client_temp = TelegramClient(f_path, API_ID, API_HASH)
-                        
                         phone_str = None
                         session_str = None
                         
+                        # استخراج البيانات مباشرة من قاعدة بيانات الـ session عبر sqlite3
                         try:
-                            await client_temp.connect()
-                            if await client_temp.is_user_authorized():
-                                me = await client_temp.get_me()
-                                if me and me.phone:
-                                    phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
-                                session_str = client_temp.session.save()
-                            await client_temp.disconnect()
-                        except Exception as conn_ex:
-                            detailed_errors.append(f"📁 المسار: `{f_path}`\n❌ خطأ اتصال تيليجرام: `{str(conn_ex)}`")
+                            conn_sql = sqlite3.connect(f_path)
+                            cursor_sql = conn_sql.cursor()
+                            cursor_sql.execute("SELECT dc_id, server_address, port, auth_key FROM sessions LIMIT 1")
+                            row = cursor_sql.fetchone()
+                            conn_sql.close()
+                            
+                            if row:
+                                dc_id, server_address, port, auth_key = row
+                                mem_session = MemorySession()
+                                mem_session.set_dc(dc_id, server_address, port)
+                                mem_session.auth_key = auth_key
+                                session_str = mem_session.save()
+                        except Exception as sqlex:
+                            detailed_errors.append(f"📁 المسار: `{f_path}`\n❌ خطأ قراءة SQLite: `{str(sqlex)}`")
 
-                        # الاحتياط بأسماء الملفات إذا تعذر الاتصال اللحظي ولكن الجلسة سليمة
-                        if not phone_str and len(file_phone_candidate) >= 10:
-                            phone_str = "+" + file_phone_candidate if not file_phone_candidate.startswith("+") else file_phone_candidate
-
-                        # إذا لم يتوفر session_str مباشر، نحاول استخراجه من قاعدة SQLite للـ session مباشرة كحل تقني بديل
-                        if not session_str:
+                        # التحقق من حالة الاتصال برقم الهاتف عبر الجلسة المستخرجة
+                        if session_str:
                             try:
-                                conn_sql = sqlite3.connect(f_path)
-                                cursor_sql = conn_sql.cursor()
-                                cursor_sql.execute("SELECT dc_id, server_address, port, auth_key FROM sessions LIMIT 1")
-                                row = cursor_sql.fetchone()
-                                conn_sql.close()
-                                if row:
-                                    dc_id, server_address, port, auth_key = row
-                                    mem_session = MemorySession()
-                                    mem_session.set_dc(dc_id, server_address, port)
-                                    mem_session.auth_key = auth_key
-                                    session_str = mem_session.save()
+                                async with TelegramClient(StringSession(session_str), API_ID, API_HASH) as test_c:
+                                    if await test_c.is_user_authorized():
+                                        me = await test_c.get_me()
+                                        if me and me.phone:
+                                            phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
                             except:
                                 pass
+
+                        # الاعتماد على اسم الملف كرقم احتياطي إذا لم يتم جلب رقم الهاتف من السيرفر لحظياً
+                        if not phone_str and len(file_phone_candidate) >= 10:
+                            phone_str = "+" + file_phone_candidate if not file_phone_candidate.startswith("+") else file_phone_candidate
 
                         if phone_str and session_str:
                             add_user_number(user_id, phone_str, session_str)
                             if phone_str not in success_numbers:
                                 success_numbers.append(phone_str)
-                        elif phone_str and not session_str:
-                            # حتى لو فشل حفظ السيشن نضع الحساب لكي لا يضيع رقمه
-                            add_user_number(user_id, phone_str, "")
-                            if phone_str not in success_numbers:
-                                success_numbers.append(phone_str)
                         else:
                             if f_path not in str(detailed_errors):
-                                detailed_errors.append(f"📁 المسار: `{f_path}`\n⚠️ تعذر استخراج الجلسة أو الرقم بانتظام.")
+                                detailed_errors.append(f"📁 المسار: `{f_path}`\n⚠️ تعذر توليد الـ StringSession بصورة صحيحة.")
                     except Exception as ex:
-                        detailed_errors.append(f"📁 المسار: `{f_path}`\n❌ خطأ في معالجة الملف: `{str(ex)}`")
+                        detailed_errors.append(f"📁 المسار: `{f_path}`\n❌ خطأ في معالجة الجلسة: `{str(ex)}`")
 
         # تنظيف الملفات المؤقتة
         import shutil
         if os.path.exists(extract_dir): shutil.rmtree(extract_dir)
         if os.path.exists(path): os.remove(path)
 
-        # الرد بالنتيجة والتقرير التفصيلي
+        # الرد بالتقرير النهائي
         response_msg = ""
         if success_numbers:
-            response_msg += f"✅ **تم بنجاح استخراج وحفظ ({len(success_numbers)}) رقماً وجلستها في قاعدتك السحابية:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:15]]) + "\n\n"
+            response_msg += f"✅ **تم تحديث واستخراج وحفظ ({len(success_numbers)}) رقماً وجلستها بنجاح تام:**\n" + "\n".join([f"- `{n}`" for n in success_numbers[:15]]) + "\n\n"
         else:
-            response_msg += "❌ **لم يتم العثور على أي أرقام صالحة بنجاح.**\n\n"
+            response_msg += "❌ **لم يتم العثور على جلسات صالحة قابلة للتحويل.**\n\n"
 
         if detailed_errors:
-            response_msg += "📋 **تقرير مسارات الملفات وأسباب الفشل:**\n" + "\n\n".join(detailed_errors[:8])
+            response_msg += "📋 **تقرير الملفات:**\n" + "\n\n".join(detailed_errors[:5])
 
         await event.respond(response_msg)
     except Exception as e:
@@ -650,4 +640,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
- 

@@ -1,2 +1,3 @@
 aiohttp
 telethon
+psycopg2-binary

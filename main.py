@@ -371,7 +371,7 @@ async def callback_handler(event):
     except Exception as e:
         logger.error(f"Error in callback handler: {e}")
 
-# --- معالجة ملفات الأرشيف والجلسات (المحدثة لتقرأ كل الأنواع تلقائياً) ---
+# --- معالجة ملفات الأرشيف والجلسات (المحدثة خصيصاً لقراءة ملفات SQLite .session الخارجية بدقة) ---
 @client.on(events.NewMessage(func=lambda e: e.file))
 async def handle_session_file(event):
     try:
@@ -386,17 +386,18 @@ async def handle_session_file(event):
         try:
             with zipfile.ZipFile(path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
-        except:
+        except Exception as e:
+            logger.error(f"Error unzipping file: {e}")
             import shutil
             shutil.move(path, os.path.join(extract_dir, "file_direct"))
 
-        await event.respond("🔍 **جاري الفحص الشامل للأرشيف واستخراج كافة الجلسات والأرقام بدقة سحابية...**")
+        await event.respond("🔍 **جاري فحص وقراءة ملفات الـ SQLite Session واستخراج الجلسات بدقة...**")
         success_numbers = []
 
         for root, dirs, files in os.walk(extract_dir):
             for file in files:
                 # تجاهل الملفات الغير صالحة مثل README وملفات المعلومات التابعة للبوتات الأخرى
-                if file.startswith('info_') or file.lower() == 'readme.txt':
+                if file.startswith('info_') or file.lower() == 'readme.txt' or file.startswith('.'):
                     continue
                     
                 f_path = os.path.join(root, file)
@@ -405,36 +406,33 @@ async def handle_session_file(event):
                     # 1. إذا كان ملف قاعدة بيانات .session (صادر من بوت خارجي)
                     if file.endswith('.session'):
                         try:
-                            tc = TelegramClient(f_path, API_ID, API_HASH)
-                            await tc.connect()
-                            if await tc.is_user_authorized():
-                                session_str = tc.session.save()
-                            await tc.disconnect()
+                            async with TelegramClient(f_path, API_ID, API_HASH) as temp_client:
+                                if await temp_client.is_user_authorized():
+                                    session_str = temp_client.session.save()
                         except Exception as inner_ex:
-                            logger.error(f"Error reading session database {file}: {inner_ex}")
+                            logger.error(f"Error opening session file {file}: {inner_ex}")
                     
-                    # 2. إذا كان ملف نصي أو ملف مباشر يحوي StringSession (صادر من بوتك أو بصيغة نصية)
+                    # 2. إذا كان ملف نصي يحوي StringSession
                     elif file.endswith('.txt') or '.' not in file:
                         with open(f_path, "r", encoding="utf-8", errors="ignore") as rf:
                             content = rf.read().strip()
                             if len(content) > 20:
                                 session_str = content
 
-                    # التحقق من صلاحية الجلسة المستخرجة وحفظها في القاعدة
+                    # التحقق وحفظ الرقم في قاعدة Neon السحابية
                     if session_str:
-                        vc = TelegramClient(StringSession(session_str), API_ID, API_HASH)
-                        await vc.connect()
-                        if await vc.is_user_authorized():
-                            me = await vc.get_me()
-                            if me and me.phone:
-                                phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
-                                add_user_number(user_id, phone_str, session_str)
-                                if phone_str not in success_numbers:
-                                    success_numbers.append(phone_str)
-                        await vc.disconnect()
+                        async with TelegramClient(StringSession(session_str), API_ID, API_HASH) as vc:
+                            if await vc.is_user_authorized():
+                                me = await vc.get_me()
+                                if me and me.phone:
+                                    phone_str = "+" + str(me.phone) if not str(me.phone).startswith("+") else str(me.phone)
+                                    add_user_number(user_id, phone_str, session_str)
+                                    if phone_str not in success_numbers:
+                                        success_numbers.append(phone_str)
                 except Exception as ex:
                     logger.error(f"Error parsing file {file}: {ex}")
 
+        # تنظيف الملفات المؤقتة
         import shutil
         if os.path.exists(extract_dir): shutil.rmtree(extract_dir)
         if os.path.exists(path): os.remove(path)
